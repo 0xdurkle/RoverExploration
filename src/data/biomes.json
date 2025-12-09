@@ -1,0 +1,90 @@
+{
+  "biomes": [
+    {
+      "id": "crystal_caverns",
+      "name": "Crystal Caverns",
+      "items": [
+        {
+          "name": "Shard of Echoing Quartz",
+          "rarity": "uncommon",
+          "baseProbability": 0.07
+        },
+        {
+          "name": "Resonant Geode Core",
+          "rarity": "rare",
+          "baseProbability": 0.02
+        },
+        {
+          "name": "Aurora Heart Crystal",
+          "rarity": "legendary",
+          "baseProbability": 0.0025
+        }
+      ]
+    },
+    {
+      "id": "withered_woods",
+      "name": "Withered Woods",
+      "items": [
+        {
+          "name": "Hollowwood Husk",
+          "rarity": "uncommon",
+          "baseProbability": 0.08
+        },
+        {
+          "name": "Spore-Touched Carapace",
+          "rarity": "rare",
+          "baseProbability": 0.02
+        },
+        {
+          "name": "The Rootmind Branch",
+          "rarity": "legendary",
+          "baseProbability": 0.002
+        }
+      ]
+    },
+    {
+      "id": "rainforest_ruins",
+      "name": "Rainforest Ruins",
+      "items": [
+        {
+          "name": "Moss-Veiled Relic",
+          "rarity": "uncommon",
+          "baseProbability": 0.07
+        },
+        {
+          "name": "Ancient Stone Glyph",
+          "rarity": "rare",
+          "baseProbability": 0.015
+        },
+        {
+          "name": "The Echo Crown",
+          "rarity": "legendary",
+          "baseProbability": 0.0015
+        }
+      ]
+    }
+  ],
+  "durations": [
+    {
+      "hours": 1,
+      "multiplier": 1.0
+    },
+    {
+      "hours": 3,
+      "multiplier": 1.25
+    },
+    {
+      "hours": 6,
+      "multiplier": 1.5
+    },
+    {
+      "hours": 12,
+      "multiplier": 2.0
+    }
+  ],
+  "rarityEmojis": {
+    "uncommon": "🟢",
+    "rare": "🔵",
+    "legendary": "🟣"
+  }
+}
