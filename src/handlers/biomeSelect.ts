@@ -23,12 +23,18 @@ export async function handleBiomeSelect(interaction: ButtonInteraction): Promise
     return;
   }
 
-  // Show duration selection buttons
-  const durations = [1, 3, 6, 12];
-  const buttons = durations.map((hours) =>
+  // Show duration selection buttons (0.008333 hours = 30 seconds)
+  const durations = [
+    { hours: 0.008333, label: '30s' },
+    { hours: 1, label: '1h' },
+    { hours: 3, label: '3h' },
+    { hours: 6, label: '6h' },
+    { hours: 12, label: '12h' }
+  ];
+  const buttons = durations.map((duration) =>
     new ButtonBuilder()
-      .setCustomId(`duration_${biomeId}_${hours}`)
-      .setLabel(`${hours}h`)
+      .setCustomId(`duration_${biomeId}_${duration.hours}`)
+      .setLabel(duration.label)
       .setStyle(ButtonStyle.Secondary)
   );
 

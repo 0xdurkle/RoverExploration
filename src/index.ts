@@ -59,14 +59,14 @@ client.once(Events.ClientReady, async (readyClient) => {
     console.error('❌ Error registering commands:', error);
   }
 
-  // Start cron job to check completed explorations every 2 minutes
-  cron.schedule('*/2 * * * *', () => {
+  // Start frequent check job (every 10 seconds for near real-time results)
+  cron.schedule('*/10 * * * * *', () => {
     checkAndProcessExplorations(client).catch((error) => {
       console.error('❌ Error in exploration check job:', error);
     });
   });
 
-  console.log('✅ Cron job started (checking every 2 minutes)');
+  console.log('✅ Exploration checker started (checking every 10 seconds)');
 });
 
 // Handle slash commands

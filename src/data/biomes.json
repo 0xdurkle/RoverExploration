@@ -12,12 +12,12 @@
         {
           "name": "Resonant Geode Core",
           "rarity": "rare",
-          "baseProbability": 0.02
+          "baseProbability": 0.035
         },
         {
           "name": "Aurora Heart Crystal",
           "rarity": "legendary",
-          "baseProbability": 0.0025
+          "baseProbability": 0.01
         }
       ]
     },
@@ -28,17 +28,17 @@
         {
           "name": "Hollowwood Husk",
           "rarity": "uncommon",
-          "baseProbability": 0.08
+          "baseProbability": 0.07
         },
         {
           "name": "Spore-Touched Carapace",
           "rarity": "rare",
-          "baseProbability": 0.02
+          "baseProbability": 0.035
         },
         {
           "name": "The Rootmind Branch",
           "rarity": "legendary",
-          "baseProbability": 0.002
+          "baseProbability": 0.01
         }
       ]
     },
@@ -54,37 +54,41 @@
         {
           "name": "Ancient Stone Glyph",
           "rarity": "rare",
-          "baseProbability": 0.015
+          "baseProbability": 0.035
         },
         {
           "name": "The Echo Crown",
           "rarity": "legendary",
-          "baseProbability": 0.0015
+          "baseProbability": 0.01
         }
       ]
     }
   ],
   "durations": [
     {
+      "hours": 0.008333,
+      "multiplier": 0.5
+    },
+    {
       "hours": 1,
-      "multiplier": 1.0
+      "multiplier": 0.5
     },
     {
       "hours": 3,
-      "multiplier": 1.25
+      "multiplier": 1.0
     },
     {
       "hours": 6,
-      "multiplier": 1.5
+      "multiplier": 2.0
     },
     {
       "hours": 12,
-      "multiplier": 2.0
+      "multiplier": 4.0
     }
   ],
   "rarityEmojis": {
-    "uncommon": "🟢",
-    "rare": "🔵",
-    "legendary": "🟣"
+    "uncommon": "🍃",
+    "rare": "✨",
+    "legendary": "💎"
   }
 }

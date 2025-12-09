@@ -3,6 +3,7 @@ import { getCompletedExplorations, Exploration } from '../db/models';
 import { finishExploration } from '../services/explorationService';
 import { getRarityEmoji } from '../services/rng';
 import { getBiome } from '../services/rng';
+import { getReturnWithItemMessage, getReturnEmptyMessage } from '../utils/messageVariations';
 
 /**
  * Check for completed explorations and post results
@@ -62,13 +63,17 @@ async function processExploration(exploration: Exploration, channel: TextChannel
     // Post result message
     if (itemFound) {
       const emoji = getRarityEmoji(itemFound.rarity);
-      await channel.send(
-        `${emoji} ${userMention} returns from the **${biomeName}** and discovered the **${itemFound.name}** (${itemFound.rarity})!`
+      const message = getReturnWithItemMessage(
+        emoji,
+        userMention,
+        `**${biomeName}**`,
+        `**${itemFound.name}**`,
+        itemFound.rarity
       );
+      await channel.send(message);
     } else {
-      await channel.send(
-        `🟤 ${userMention} returns from the **${biomeName}** empty-handed.`
-      );
+      const message = getReturnEmptyMessage(userMention, `**${biomeName}**`);
+      await channel.send(message);
     }
   } catch (error) {
     console.error(`❌ Error processing exploration ${exploration.id}:`, error);

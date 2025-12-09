@@ -21,10 +21,16 @@ export async function initDatabase(): Promise<void> {
     throw new Error('DATABASE_URL must be a PostgreSQL connection string (starts with postgresql://)');
   }
 
+  // Determine SSL settings
+  // Supabase always requires SSL, other cloud providers in production, localhost never needs it
+  const isLocalhost = databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1');
+  const isSupabase = databaseUrl.includes('supabase');
+  const needsSSL = isSupabase || (!isLocalhost && process.env.NODE_ENV === 'production');
+
   // Create PostgreSQL connection pool
   pool = new Pool({
     connectionString: databaseUrl,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    ssl: needsSSL ? { rejectUnauthorized: false } : false,
   });
 
   // Test connection
@@ -65,7 +71,7 @@ async function createTables(): Promise<void> {
         id SERIAL PRIMARY KEY,
         user_id VARCHAR(20) NOT NULL,
         biome VARCHAR(50) NOT NULL,
-        duration_hours INTEGER NOT NULL,
+        duration_hours NUMERIC(10, 6) NOT NULL,
         started_at TIMESTAMP NOT NULL,
         ends_at TIMESTAMP NOT NULL,
         completed BOOLEAN DEFAULT FALSE,
@@ -96,6 +102,21 @@ async function createTables(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_explorations_user_id 
       ON explorations(user_id)
     `);
+
+    // Migrate duration_hours from INTEGER to NUMERIC if needed (for 30s support)
+    try {
+      await pool.query(`
+        ALTER TABLE explorations 
+        ALTER COLUMN duration_hours TYPE NUMERIC(10, 6) 
+        USING duration_hours::NUMERIC(10, 6)
+      `);
+      console.log('✅ Migrated duration_hours column to support decimals');
+    } catch (error: any) {
+      // Column might already be NUMERIC or error is fine
+      if (!error.message.includes('does not exist') && !error.message.includes('already exists')) {
+        console.log('ℹ️  duration_hours column type check:', error.message);
+      }
+    }
 
     console.log('✅ Database tables created/verified');
   } catch (error) {
