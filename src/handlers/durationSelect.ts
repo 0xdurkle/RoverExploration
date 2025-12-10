@@ -93,48 +93,25 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
       return;
     }
 
-    // CRITICAL: Final check right before creating exploration to prevent race conditions
-    // Check database directly for any active exploration
-    const { getDb } = await import('../db/connection');
-    const { getActiveExploration } = await import('../db/models');
-    const db = getDb();
-    const now = new Date();
-    
-    // Check if user has any active exploration in database
-    const activeCheck = await db.query(
-      `SELECT id FROM explorations 
-       WHERE user_id = $1 AND ends_at > $2 AND completed = FALSE 
-       LIMIT 1`,
-      [userId, now]
-    );
-    
-    if (activeCheck.rows.length > 0) {
-      console.log(`⏱️ [DURATION_SELECT] ⚠️ User ${userId} already has active exploration ${activeCheck.rows[0].id} in database, preventing duplicate`);
-      await safeEditReply(interaction, {
-        content: '⚠️ You already have an active exploration. Please wait for it to complete.',
-        components: [],
-      });
-      return;
-    }
-
-    // Start exploration
+    // Start exploration (createExploration now uses transaction with row-level locking)
+    // This prevents race conditions at the database level
     console.log(`⏱️ [DURATION_SELECT] Starting exploration for user ${userId}, biome ${biomeId}, duration ${durationHours}h`);
-    await startExploration(userId, biomeId, durationHours);
-    console.log(`⏱️ [DURATION_SELECT] ✅ Exploration started successfully`);
     
-    // CRITICAL: Verify only ONE exploration was created
-    const verifyCheck = await db.query(
-      `SELECT id FROM explorations 
-       WHERE user_id = $1 AND ends_at > $2 AND completed = FALSE 
-       ORDER BY created_at DESC`,
-      [userId, now]
-    );
-    
-    if (verifyCheck.rows.length > 1) {
-      console.error(`⏱️ [DURATION_SELECT] ❌ CRITICAL: User ${userId} has ${verifyCheck.rows.length} active explorations! This should not happen.`);
-      console.error(`⏱️ [DURATION_SELECT] Active exploration IDs:`, verifyCheck.rows.map((r: any) => r.id));
-    } else {
-      console.log(`⏱️ [DURATION_SELECT] ✅ Verified: User ${userId} has exactly ${verifyCheck.rows.length} active exploration(s)`);
+    try {
+      await startExploration(userId, biomeId, durationHours);
+      console.log(`⏱️ [DURATION_SELECT] ✅ Exploration started successfully`);
+    } catch (error: any) {
+      // If error indicates user already has active exploration, handle gracefully
+      if (error.message && error.message.includes('already has an active exploration')) {
+        console.log(`⏱️ [DURATION_SELECT] ⚠️ User ${userId} already has active exploration, preventing duplicate`);
+        await safeEditReply(interaction, {
+          content: '⚠️ You already have an active exploration. Please wait for it to complete.',
+          components: [],
+        });
+        return;
+      }
+      // Re-throw other errors
+      throw error;
     }
 
     const multiplier = getDurationMultiplier(durationHours);

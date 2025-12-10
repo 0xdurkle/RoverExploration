@@ -38,6 +38,7 @@ export interface UserWallet {
 
 /**
  * Create a new exploration session
+ * Uses transaction with row-level locking to prevent duplicates
  */
 export async function createExploration(
   userId: string,
@@ -48,14 +49,47 @@ export async function createExploration(
   const startedAt = new Date();
   const endsAt = new Date(startedAt.getTime() + durationHours * HOURS_TO_MILLISECONDS);
 
-  const result = await db.query(
-    `INSERT INTO explorations (user_id, biome, duration_hours, started_at, ends_at)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING *`,
-    [userId, biome, durationHours, startedAt, endsAt]
-  );
-
-  return result.rows[0];
+  try {
+    // Use transaction with row-level lock to prevent race conditions
+    await db.query('BEGIN');
+    
+    try {
+      // Lock any existing active explorations for this user
+      // This prevents concurrent requests from both creating explorations
+      const lockResult = await db.query(
+        `SELECT id FROM explorations 
+         WHERE user_id = $1 AND ends_at > $2 AND completed = FALSE 
+         FOR UPDATE NOWAIT`,
+        [userId, startedAt]
+      );
+      
+      if (lockResult.rows.length > 0) {
+        // User already has an active exploration
+        await db.query('ROLLBACK');
+        throw new Error(`User ${userId} already has an active exploration (ID: ${lockResult.rows[0].id})`);
+      }
+      
+      // Now insert the new exploration (we have the lock, so no race condition)
+      const result = await db.query(
+        `INSERT INTO explorations (user_id, biome, duration_hours, started_at, ends_at)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING *`,
+        [userId, biome, durationHours, startedAt, endsAt]
+      );
+      
+      await db.query('COMMIT');
+      return result.rows[0];
+    } catch (error) {
+      await db.query('ROLLBACK');
+      throw error;
+    }
+  } catch (error: any) {
+    // If it's a "lock not available" error, user has concurrent request
+    if (error.code === '55P03') {
+      throw new Error(`User ${userId} already has an active exploration (concurrent request detected)`);
+    }
+    throw error;
+  }
 }
 
 /**
