@@ -84,16 +84,16 @@ client.once(Events.ClientReady, async (readyClient) => {
 });
 
 // Track processed interactions to prevent duplicate processing
-const processedInteractions = new Set<string>();
+// Use Map with promises to make deduplication atomic and prevent race conditions
+const processingInteractions = new Map<string, Promise<void>>();
 const PROCESSED_CLEANUP_INTERVAL = 60000; // Clean up after 1 minute
 
 // Clean up old interaction IDs periodically
 setInterval(() => {
-  const before = processedInteractions.size;
+  const before = processingInteractions.size;
   // Keep only recent interactions (this is just for memory management)
-  // The Set will naturally prevent duplicates during the cleanup window
-  if (processedInteractions.size > 1000) {
-    processedInteractions.clear();
+  if (processingInteractions.size > 1000) {
+    processingInteractions.clear();
     console.log(`🧹 [INTERACTION] Cleared processed interactions cache (had ${before} entries)`);
   }
 }, PROCESSED_CLEANUP_INTERVAL);
@@ -102,13 +102,20 @@ setInterval(() => {
 client.on(Events.InteractionCreate, async (interaction) => {
   // Add error handling wrapper
   try {
-    // CRITICAL: Prevent duplicate processing of the same interaction
+    // CRITICAL: Prevent duplicate processing of the same interaction atomically
     // Discord may send the same interaction event multiple times
-    if (processedInteractions.has(interaction.id)) {
-      console.log(`⚠️ [INTERACTION] Interaction ${interaction.id} already processed, ignoring duplicate event`);
+    // Use Map to make check-and-set atomic - if key exists, interaction is already processing
+    if (processingInteractions.has(interaction.id)) {
+      console.log(`⚠️ [INTERACTION] Interaction ${interaction.id} already processing, ignoring duplicate event`);
       return;
     }
-    processedInteractions.add(interaction.id);
+    
+    // Create a promise for this interaction and store it immediately (atomic operation)
+    let resolveProcessing: () => void;
+    const processingPromise = new Promise<void>((resolve) => {
+      resolveProcessing = resolve;
+    });
+    processingInteractions.set(interaction.id, processingPromise);
     
     // Log all interactions for debugging
     if (interaction.isButton()) {
@@ -151,6 +158,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await handlePartyJoin(interaction);
     }
   }
+    
+    // Mark interaction as complete
+    resolveProcessing!();
+    processingInteractions.delete(interaction.id);
   } catch (error) {
     console.error(`❌ [INTERACTION] Unhandled error in interaction handler:`, error);
     console.error(`❌ [INTERACTION] Error stack:`, error instanceof Error ? error.stack : String(error));
@@ -165,6 +176,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
     } catch (responseError) {
       console.error(`❌ [INTERACTION] Failed to send error response:`, responseError);
+    }
+    
+    // Always clean up processing flag, even on error
+    if (processingInteractions.has(interaction.id)) {
+      processingInteractions.get(interaction.id)?.then(() => {
+        processingInteractions.delete(interaction.id);
+      });
+      processingInteractions.delete(interaction.id);
     }
   }
 });
