@@ -299,20 +299,42 @@ async function updateUserProfile(
     }
     
     const savedItems = result.rows[0].items_found;
-    const savedCount = Array.isArray(savedItems) ? savedItems.length : 0;
+    const savedItemsArray = Array.isArray(savedItems) ? savedItems : [];
+    const savedCount = savedItemsArray.length;
     const newExplorationCount = result.rows[0].total_explorations;
     
     console.log(`📋 [UPDATE_USER_PROFILE] ✅ Profile upserted for user ${userId}`);
     console.log(`📋 [UPDATE_USER_PROFILE] Total explorations: ${oldExplorationCount} → ${newExplorationCount}`);
     console.log(`📋 [UPDATE_USER_PROFILE] Items saved: ${savedCount} (expected: ${itemsFound.length})`);
     
-    // Log warnings if counts don't match (but don't throw - data is saved)
+    // CRITICAL: Verify exploration count was incremented
     if (newExplorationCount !== oldExplorationCount + 1) {
-      console.error(`📋 [UPDATE_USER_PROFILE] ⚠️ WARNING: Exploration count mismatch! Expected ${oldExplorationCount + 1}, got ${newExplorationCount}`);
+      console.error(`📋 [UPDATE_USER_PROFILE] ❌ CRITICAL: Exploration count mismatch! Expected ${oldExplorationCount + 1}, got ${newExplorationCount}`);
+      throw new Error(`Failed to increment exploration count for user ${userId}`);
     }
-    if (savedCount !== itemsFound.length) {
-      console.error(`📋 [UPDATE_USER_PROFILE] ⚠️ WARNING: Item count mismatch! Expected ${itemsFound.length}, got ${savedCount}`);
+    
+    // CRITICAL: Verify item count matches (if item was supposed to be added)
+    if (itemFound && savedCount !== itemsFound.length) {
+      console.error(`📋 [UPDATE_USER_PROFILE] ❌ CRITICAL: Item count mismatch! Expected ${itemsFound.length}, got ${savedCount}`);
+      throw new Error(`Failed to save all items for user ${userId}`);
     }
+    
+    // CRITICAL: If item was found, verify it's actually in the saved items array
+    if (itemFound) {
+      console.log(`📋 [UPDATE_USER_PROFILE] Verifying item "${itemFound.name}" is in saved items...`);
+      const itemExists = savedItemsArray.some((item: any) => 
+        item && item.name === itemFound.name && item.rarity === itemFound.rarity
+      );
+      
+      if (!itemExists) {
+        console.error(`📋 [UPDATE_USER_PROFILE] ❌ CRITICAL: Item "${itemFound.name}" was NOT found in saved items!`);
+        console.error(`📋 [UPDATE_USER_PROFILE] Expected item:`, JSON.stringify(itemFound, null, 2));
+        console.error(`📋 [UPDATE_USER_PROFILE] Saved items:`, JSON.stringify(savedItemsArray, null, 2));
+        throw new Error(`Item "${itemFound.name}" was not saved to user profile inventory for user ${userId}`);
+      }
+      console.log(`📋 [UPDATE_USER_PROFILE] ✅ Verified: Item "${itemFound.name}" is in saved items`);
+    }
+    
     console.log(`📋 [UPDATE_USER_PROFILE] ==========================================\n`);
   } catch (error) {
     console.error(`📋 [UPDATE_USER_PROFILE] ❌ Error in updateUserProfile for user ${userId}:`, error);

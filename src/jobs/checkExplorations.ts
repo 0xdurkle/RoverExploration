@@ -121,17 +121,17 @@ async function processExploration(exploration: Exploration, channel: TextChannel
     });
     
     if (!verifyProfile.rows[0]) {
-      console.error(`🔄 [PROCESS_EXPLORATION] ⚠️ WARNING: User profile not found for user ${exploration.user_id}!`);
+      console.error(`🔄 [PROCESS_EXPLORATION] ❌ CRITICAL: User profile not found for user ${exploration.user_id}!`);
       console.error(`🔄 [PROCESS_EXPLORATION] Profile should have been created during completeExploration`);
-      // Continue anyway - might be a race condition, can be fixed with /repair
+      throw new Error(`User profile not found for user ${exploration.user_id} after exploration completion`);
     }
     
-    // Verify exploration count was incremented (should be at least 1)
+    // CRITICAL: Verify exploration count was incremented (should be at least 1)
     const totalExplorations = verifyProfile.rows[0].total_explorations || 0;
     if (totalExplorations < 1) {
-      console.error(`🔄 [PROCESS_EXPLORATION] ⚠️ WARNING: User ${exploration.user_id} has ${totalExplorations} total explorations!`);
+      console.error(`🔄 [PROCESS_EXPLORATION] ❌ CRITICAL: User ${exploration.user_id} has ${totalExplorations} total explorations!`);
       console.error(`🔄 [PROCESS_EXPLORATION] This should not happen - exploration was completed but count is 0`);
-      // Don't throw - continue to send message, but log the issue
+      throw new Error(`Exploration count was not incremented for user ${exploration.user_id}. Data integrity check failed.`);
     } else {
       console.log(`🔄 [PROCESS_EXPLORATION] ✅ Verified: User ${exploration.user_id} has ${totalExplorations} total exploration(s)`);
     }
@@ -166,40 +166,9 @@ async function processExploration(exploration: Exploration, channel: TextChannel
         console.error(`🔄 [PROCESS_EXPLORATION] ❌ CRITICAL: Item "${itemFound.name}" was NOT saved to user ${exploration.user_id}'s inventory!`);
         console.error(`🔄 [PROCESS_EXPLORATION] User has ${itemsArray.length} items in inventory, but "${itemFound.name}" is missing!`);
         console.error(`🔄 [PROCESS_EXPLORATION] All items in inventory:`, JSON.stringify(itemsArray, null, 2));
-        console.error(`🔄 [PROCESS_EXPLORATION] Attempting to recover item by re-saving...`);
-        
-        // Try to recover by re-saving the item
-        try {
-          const { getDb } = await import('../db/connection');
-          const db = getDb();
-          const currentProfile = await db.query(
-            `SELECT items_found FROM user_profiles WHERE user_id = $1`,
-            [exploration.user_id]
-          );
-          
-          if (currentProfile.rows[0]) {
-            let currentItems: any[] = [];
-            const raw = currentProfile.rows[0].items_found;
-            if (Array.isArray(raw)) {
-              currentItems = [...raw];
-            } else if (raw && typeof raw === 'string') {
-              currentItems = JSON.parse(raw);
-            }
-            
-            // Add the missing item
-            currentItems.push(itemFound);
-            
-            await db.query(
-              `UPDATE user_profiles SET items_found = $1::jsonb WHERE user_id = $2`,
-              [JSON.stringify(currentItems), exploration.user_id]
-            );
-            
-            console.log(`🔄 [PROCESS_EXPLORATION] ✅ Recovered: Item "${itemFound.name}" re-added to inventory`);
-          }
-        } catch (recoveryError) {
-          console.error(`🔄 [PROCESS_EXPLORATION] ❌ Failed to recover item:`, recoveryError);
-          // Continue anyway - item is in explorations table, can be recovered with /repair
-        }
+        console.error(`🔄 [PROCESS_EXPLORATION] Expected item:`, JSON.stringify(itemFound, null, 2));
+        console.error(`🔄 [PROCESS_EXPLORATION] This is a critical data integrity error - item was not saved properly`);
+        throw new Error(`Item "${itemFound.name}" was not saved to user profile inventory. Data integrity check failed.`);
       } else {
         console.log(`🔄 [PROCESS_EXPLORATION] ✅ Verified: Item "${itemFound.name}" is in user ${exploration.user_id}'s inventory`);
       }
