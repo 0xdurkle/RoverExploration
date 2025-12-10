@@ -4,6 +4,7 @@ import { initDatabase } from '../db/connection';
 
 /**
  * Admin command to end all active explorations
+ * This command allows administrators to end all currently active explorations
  */
 export async function handleEndAllCommand(interaction: ChatInputCommandInteraction): Promise<void> {
   await interaction.deferReply({ ephemeral: true });
