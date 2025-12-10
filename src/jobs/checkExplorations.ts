@@ -45,6 +45,7 @@ export async function checkAndProcessExplorations(client: Client): Promise<void>
  */
 async function processExploration(exploration: Exploration, channel: TextChannel): Promise<void> {
   try {
+    console.log(`🔄 processExploration: Starting for exploration ${exploration.id}, user ${exploration.user_id}, biome ${exploration.biome}`);
     const biome = getBiome(exploration.biome);
     const biomeName = biome?.name || exploration.biome;
 
@@ -55,6 +56,7 @@ async function processExploration(exploration: Exploration, channel: TextChannel
       exploration.biome,
       exploration.duration_hours
     );
+    console.log(`   ✅ finishExploration completed, itemFound:`, itemFound ? `${itemFound.name} (${itemFound.rarity})` : 'null');
 
     // Get user mention
     const user = await channel.client.users.fetch(exploration.user_id);

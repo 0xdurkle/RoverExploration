@@ -102,22 +102,34 @@ export async function completeExploration(
 ): Promise<void> {
   const db = getDb();
 
-  await db.query(
-    `UPDATE explorations
-     SET completed = TRUE, item_found = $1
-     WHERE id = $2`,
-    [itemFound ? JSON.stringify(itemFound) : null, explorationId]
-  );
+  try {
+    console.log(`🔧 completeExploration: Starting for exploration ${explorationId}, itemFound:`, itemFound ? JSON.stringify(itemFound) : 'null');
+    
+    await db.query(
+      `UPDATE explorations
+       SET completed = TRUE, item_found = $1
+       WHERE id = $2`,
+      [itemFound ? JSON.stringify(itemFound) : null, explorationId]
+    );
+    console.log(`   ✅ Updated exploration ${explorationId} in database`);
 
-  // Update user profile
-  const exploration = await db.query(
-    `SELECT user_id, ends_at FROM explorations WHERE id = $1`,
-    [explorationId]
-  );
+    // Update user profile
+    const exploration = await db.query(
+      `SELECT user_id, ends_at FROM explorations WHERE id = $1`,
+      [explorationId]
+    );
 
-  if (exploration.rows[0]) {
-    const { user_id, ends_at } = exploration.rows[0];
-    await updateUserProfile(user_id, ends_at, itemFound);
+    if (exploration.rows[0]) {
+      const { user_id, ends_at } = exploration.rows[0];
+      console.log(`   📝 Updating profile for user ${user_id} with item:`, itemFound ? `${itemFound.name} (${itemFound.rarity})` : 'none');
+      await updateUserProfile(user_id, ends_at, itemFound);
+      console.log(`   ✅ Successfully updated profile for user ${user_id}`);
+    } else {
+      console.error(`   ❌ No exploration found with id ${explorationId}`);
+    }
+  } catch (error) {
+    console.error(`   ❌ Error in completeExploration for ${explorationId}:`, error);
+    throw error;
   }
 }
 
@@ -131,13 +143,17 @@ async function updateUserProfile(
 ): Promise<void> {
   const db = getDb();
 
-  // Check if profile exists
-  const existing = await db.query(
-    `SELECT * FROM user_profiles WHERE user_id = $1`,
-    [userId]
-  );
+  try {
+    console.log(`🔧 updateUserProfile: Starting for user ${userId}, itemFound:`, itemFound ? JSON.stringify(itemFound) : 'null');
+    
+    // Check if profile exists
+    const existing = await db.query(
+      `SELECT * FROM user_profiles WHERE user_id = $1`,
+      [userId]
+    );
 
-  if (existing.rows[0]) {
+    if (existing.rows[0]) {
+      console.log(`   📋 Profile exists for user ${userId}, current items:`, existing.rows[0].items_found);
     // Update existing profile
     // PostgreSQL JSONB is automatically parsed, but handle null/undefined cases
     let itemsFound: any[] = [];
@@ -174,40 +190,58 @@ async function updateUserProfile(
     }
 
     const itemsJson = JSON.stringify(itemsFound);
-    await db.query(
+    console.log(`   💾 Saving to database: ${itemsFound.length} items, JSON length: ${itemsJson.length}`);
+    
+    const updateResult = await db.query(
       `UPDATE user_profiles
        SET total_explorations = total_explorations + 1,
            items_found = $1::jsonb,
            last_exploration_end = $2
-       WHERE user_id = $3`,
+       WHERE user_id = $3
+       RETURNING items_found, total_explorations`,
       [itemsJson, lastExplorationEnd, userId]
     );
-    console.log(`✅ Updated profile for user ${userId}. Total explorations: ${existing.rows[0].total_explorations + 1}, Items: ${itemsFound.length}`);
     
-    // Verify the save worked
-    const verify = await db.query(
-      `SELECT items_found FROM user_profiles WHERE user_id = $1`,
-      [userId]
-    );
-    if (verify.rows[0]) {
-      const savedItems = verify.rows[0].items_found;
-      console.log(`   Verified: ${Array.isArray(savedItems) ? savedItems.length : 'NOT ARRAY'} items in database`);
-    }
-  } else {
-    // Create new profile
-    const itemsFound = itemFound ? [itemFound] : [];
-
-    if (itemFound) {
-      console.log(`✅ Creating new profile for user ${userId} with item "${itemFound.name}"`);
+    if (updateResult.rows[0]) {
+      const savedItems = updateResult.rows[0].items_found;
+      const savedCount = Array.isArray(savedItems) ? savedItems.length : 0;
+      console.log(`   ✅ Updated profile for user ${userId}. Total explorations: ${updateResult.rows[0].total_explorations}, Items saved: ${savedCount}`);
+      
+      if (savedCount !== itemsFound.length) {
+        console.error(`   ⚠️ WARNING: Expected ${itemsFound.length} items but database has ${savedCount}!`);
+        console.error(`   Expected items:`, JSON.stringify(itemsFound));
+        console.error(`   Saved items:`, JSON.stringify(savedItems));
+      }
     } else {
-      console.log(`✅ Creating new profile for user ${userId} (no item found)`);
+      console.error(`   ❌ Update query returned no rows for user ${userId}`);
     }
+    } else {
+      // Create new profile
+      console.log(`   📝 Creating NEW profile for user ${userId}`);
+      const itemsFound = itemFound ? [itemFound] : [];
 
-    await db.query(
-      `INSERT INTO user_profiles (user_id, total_explorations, items_found, last_exploration_end)
-       VALUES ($1, 1, $2::jsonb, $3)`,
-      [userId, JSON.stringify(itemsFound), lastExplorationEnd]
-    );
+      if (itemFound) {
+        console.log(`   ✅ Creating new profile for user ${userId} with item "${itemFound.name}"`);
+      } else {
+        console.log(`   ✅ Creating new profile for user ${userId} (no item found)`);
+      }
+
+      const insertResult = await db.query(
+        `INSERT INTO user_profiles (user_id, total_explorations, items_found, last_exploration_end)
+         VALUES ($1, 1, $2::jsonb, $3)
+         RETURNING items_found, total_explorations`,
+        [userId, JSON.stringify(itemsFound), lastExplorationEnd]
+      );
+      
+      if (insertResult.rows[0]) {
+        const savedItems = insertResult.rows[0].items_found;
+        console.log(`   ✅ Created profile for user ${userId} with ${Array.isArray(savedItems) ? savedItems.length : 0} items`);
+      }
+    }
+  } catch (error) {
+    console.error(`   ❌ Error in updateUserProfile for user ${userId}:`, error);
+    console.error(`   Error details:`, error instanceof Error ? error.stack : String(error));
+    throw error;
   }
 }
 
