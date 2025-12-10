@@ -6,8 +6,6 @@ import { handleExploreCommand, getExploreCommandBuilder } from './commands/explo
 import { handleWalletSet, handleWalletView, getWalletCommandBuilder } from './commands/wallet';
 import { handleInventoryCommand, getInventoryCommandBuilder } from './commands/inventory';
 import { handlePartyCreate, getPartyCommandBuilder } from './commands/party';
-import { handleDebugCommand, getDebugCommandBuilder } from './commands/debug';
-import { handleRepairCommand, getRepairCommandBuilder } from './commands/repair';
 import { handleEndAllCommand, getEndAllCommandBuilder } from './commands/endAll';
 import { handleHowCommand, getHowCommandBuilder } from './commands/how';
 import { handlePartyJoin } from './handlers/partyJoin';
@@ -50,8 +48,6 @@ client.once(Events.ClientReady, async (readyClient) => {
       getWalletCommandBuilder().toJSON(),
       getInventoryCommandBuilder().toJSON(),
       getPartyCommandBuilder().toJSON(),
-      getDebugCommandBuilder().toJSON(),
-      getRepairCommandBuilder().toJSON(),
       getEndAllCommandBuilder().toJSON(),
       getHowCommandBuilder().toJSON(),
     ];
@@ -144,10 +140,6 @@ if (!interactionHandlerRegistered) {
         if (subcommand === 'create') {
           await handlePartyCreate(interaction);
         }
-      } else if (interaction.commandName === 'debug') {
-        await handleDebugCommand(interaction);
-      } else if (interaction.commandName === 'repair') {
-        await handleRepairCommand(interaction);
       } else if (interaction.commandName === 'endall') {
         await handleEndAllCommand(interaction);
       } else if (interaction.commandName === 'how') {
