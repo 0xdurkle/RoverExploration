@@ -182,9 +182,9 @@ async function updateUserProfile(
 
     if (existing.rows[0]) {
       console.log(`   📋 Profile exists for user ${userId}, current items:`, existing.rows[0].items_found);
-    // Update existing profile
-    // PostgreSQL JSONB is automatically parsed, but handle null/undefined cases
-    let itemsFound: any[] = [];
+      // Update existing profile
+      // PostgreSQL JSONB is automatically parsed, but handle null/undefined cases
+      let itemsFound: any[] = [];
     const rawItemsFound = existing.rows[0].items_found;
     
     if (Array.isArray(rawItemsFound)) {
@@ -242,6 +242,27 @@ async function updateUserProfile(
       }
     } else {
       console.error(`   ❌ Update query returned no rows for user ${userId}`);
+      throw new Error(`Failed to update user profile for user ${userId}`);
+    }
+    
+    // CRITICAL: Verify item was actually saved to user profile
+    if (itemFound) {
+      const verifyResult = await db.query(
+        `SELECT items_found FROM user_profiles WHERE user_id = $1`,
+        [userId]
+      );
+      if (verifyResult.rows[0]) {
+        const savedItems = verifyResult.rows[0].items_found;
+        const itemsArray = Array.isArray(savedItems) ? savedItems : [];
+        const itemExists = itemsArray.some((item: any) => 
+          item && item.name === itemFound.name && item.rarity === itemFound.rarity
+        );
+        if (!itemExists) {
+          console.error(`   ❌ CRITICAL: Item "${itemFound.name}" was NOT saved to user ${userId}'s inventory!`);
+          throw new Error(`Item "${itemFound.name}" was not saved to user profile`);
+        }
+        console.log(`   ✅ Verified: Item "${itemFound.name}" is in user ${userId}'s inventory`);
+      }
     }
     } else {
       // Create new profile
