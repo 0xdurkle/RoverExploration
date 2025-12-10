@@ -90,12 +90,12 @@ export async function handleInventoryCommand(interaction: ChatInputCommandIntera
 
     // Add stats
     const stats: string[] = [];
-    stats.push(`📘 **Total Explorations:** ${totalExplorations}`);
-    stats.push(`🔥 **Current Streak:** ${currentStreak} day${currentStreak !== 1 ? 's' : ''}`);
-    stats.push(`🔥 **Longest Streak:** ${longestStreak} day${longestStreak !== 1 ? 's' : ''}`);
+    stats.push(`**Total Explorations:** ${totalExplorations}`);
+    stats.push(`**Current Streak:** ${currentStreak} day${currentStreak !== 1 ? 's' : ''}`);
+    stats.push(`**Longest Streak:** ${longestStreak} day${longestStreak !== 1 ? 's' : ''}`);
 
     embed.addFields({
-      name: '📊 Stats',
+      name: 'Stats',
       value: stats.join('\n'),
       inline: false,
     });
