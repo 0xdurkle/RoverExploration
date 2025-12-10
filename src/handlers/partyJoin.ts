@@ -1,5 +1,5 @@
 import { ButtonInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import { joinParty, getPartyByMessageId } from '../services/partyService';
+import { joinParty, getPartyByMessageId, MAX_PARTY_SIZE } from '../services/partyService';
 
 /**
  * Handle party join button click
@@ -36,7 +36,7 @@ export async function handlePartyJoin(interaction: ButtonInteraction): Promise<v
       return `${index + 1}. ${isCreator ? '👑' : '👤'} <@${member.userId}>`;
     }).join('\n');
 
-    const slotsRemaining = 5 - updatedParty.joinedUsers.length;
+    const slotsRemaining = MAX_PARTY_SIZE - updatedParty.joinedUsers.length;
     const countdownSeconds = Math.max(0, Math.ceil((updatedParty.expiresAt.getTime() - Date.now()) / 1000));
 
     const embed = new EmbedBuilder()

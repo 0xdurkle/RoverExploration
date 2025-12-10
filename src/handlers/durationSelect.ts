@@ -3,6 +3,7 @@ import { startExploration } from '../services/explorationService';
 import { getBiome, getDurationMultiplier } from '../services/rng';
 import { getCooldownRemaining } from '../services/cooldownService';
 import { getExplorationStartMessage } from '../utils/messageVariations';
+import { HOURS_TO_MILLISECONDS } from '../constants';
 
 /**
  * Handle duration selection button click
@@ -46,7 +47,7 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
     // Format duration display
     let durationText: string;
     if (durationHours < 1) {
-      const seconds = Math.round(durationHours * 3600);
+      const seconds = Math.round(durationHours * (HOURS_TO_MILLISECONDS / 1000));
       durationText = `${seconds}s`;
     } else if (durationHours === 1) {
       durationText = '1 hour';

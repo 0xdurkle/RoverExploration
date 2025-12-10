@@ -43,7 +43,7 @@ export async function handleWalletSet(
     console.error('Error saving wallet:', error);
     
     // Check for unique constraint violation (wallet already linked to another account)
-    if (error.code === '23505' && error.constraint === 'user_wallets_wallet_address_unique') {
+    if (error.code === '23505' && error.constraint === 'user_wallets_wallet_address_key') {
       await interaction.editReply({
         content: '❌ This wallet address is already linked to another Discord account. Each wallet can only be linked to one account.',
       });

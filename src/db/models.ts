@@ -1,4 +1,5 @@
 import { getDb } from './connection';
+import { HOURS_TO_MILLISECONDS } from '../constants';
 
 export interface Exploration {
   id: number;
@@ -45,7 +46,7 @@ export async function createExploration(
 ): Promise<Exploration> {
   const db = getDb();
   const startedAt = new Date();
-  const endsAt = new Date(startedAt.getTime() + durationHours * 60 * 60 * 1000);
+  const endsAt = new Date(startedAt.getTime() + durationHours * HOURS_TO_MILLISECONDS);
 
   const result = await db.query(
     `INSERT INTO explorations (user_id, biome, duration_hours, started_at, ends_at)
@@ -153,6 +154,13 @@ async function updateUserProfile(
     }
 
     if (itemFound) {
+      // Validate rarity before saving
+      const validRarities: Array<'uncommon' | 'rare' | 'legendary'> = ['uncommon', 'rare', 'legendary'];
+      if (!validRarities.includes(itemFound.rarity)) {
+        console.error(`❌ Invalid rarity "${itemFound.rarity}" for item "${itemFound.name}" when saving to database`);
+        throw new Error(`Invalid rarity "${itemFound.rarity}" for item "${itemFound.name}"`);
+      }
+      
       // Ensure itemFound has all required fields
       const itemToSave: ItemFound = {
         name: itemFound.name,
@@ -161,18 +169,30 @@ async function updateUserProfile(
         found_at: itemFound.found_at instanceof Date ? itemFound.found_at : new Date(itemFound.found_at),
       };
       itemsFound.push(itemToSave);
-      console.log(`✅ Adding item "${itemToSave.name}" to user ${userId}'s inventory. Total items: ${itemsFound.length}`);
+      console.log(`✅ Adding item "${itemToSave.name}" (${itemToSave.rarity}) from ${itemToSave.biome} to user ${userId}'s inventory. Total items: ${itemsFound.length}`);
+      console.log(`   Full items array:`, JSON.stringify(itemsFound, null, 2));
     }
 
+    const itemsJson = JSON.stringify(itemsFound);
     await db.query(
       `UPDATE user_profiles
        SET total_explorations = total_explorations + 1,
            items_found = $1::jsonb,
            last_exploration_end = $2
        WHERE user_id = $3`,
-      [JSON.stringify(itemsFound), lastExplorationEnd, userId]
+      [itemsJson, lastExplorationEnd, userId]
     );
     console.log(`✅ Updated profile for user ${userId}. Total explorations: ${existing.rows[0].total_explorations + 1}, Items: ${itemsFound.length}`);
+    
+    // Verify the save worked
+    const verify = await db.query(
+      `SELECT items_found FROM user_profiles WHERE user_id = $1`,
+      [userId]
+    );
+    if (verify.rows[0]) {
+      const savedItems = verify.rows[0].items_found;
+      console.log(`   Verified: ${Array.isArray(savedItems) ? savedItems.length : 'NOT ARRAY'} items in database`);
+    }
   } else {
     // Create new profile
     const itemsFound = itemFound ? [itemFound] : [];
@@ -213,16 +233,30 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
   if (Array.isArray(profile.items_found)) {
     itemsFound = profile.items_found;
   } else if (profile.items_found && typeof profile.items_found === 'string') {
-    itemsFound = JSON.parse(profile.items_found);
+    try {
+      itemsFound = JSON.parse(profile.items_found);
+    } catch (e) {
+      console.error(`❌ Error parsing items_found JSON for user ${userId}:`, e);
+      itemsFound = [];
+    }
   } else if (profile.items_found) {
     itemsFound = [profile.items_found];
   }
+  
+  // Log what we retrieved
+  console.log(`📥 Retrieved profile for user ${userId}: ${itemsFound.length} items from database`);
 
   // Parse dates in items_found
-  itemsFound = itemsFound.map((item: any) => ({
-    ...item,
-    found_at: item.found_at instanceof Date ? item.found_at : new Date(item.found_at),
-  }));
+  itemsFound = itemsFound.map((item: any) => {
+    if (!item || typeof item !== 'object') {
+      console.error(`❌ Invalid item in database for user ${userId}:`, item);
+      return null;
+    }
+    return {
+      ...item,
+      found_at: item.found_at instanceof Date ? item.found_at : new Date(item.found_at),
+    };
+  }).filter(item => item !== null) as ItemFound[];
 
   return {
     ...profile,

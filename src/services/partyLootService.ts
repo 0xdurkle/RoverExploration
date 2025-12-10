@@ -5,6 +5,12 @@
 
 import biomesData from '../data/biomes.json';
 import { applyPartyBonus } from './partyService';
+import {
+  DURATION_30_SECONDS_HOURS,
+  FLOAT_COMPARISON_TOLERANCE,
+  RARITY_ORDER,
+  TEST_PROBABILITIES,
+} from '../constants';
 
 interface Biome {
   id: string;
@@ -32,26 +38,26 @@ export function rollPartyLoot(biomeId: string, durationHours: number, partySize:
   }
 
   // Check if this is a 30-second exploration (for testing with special probabilities)
-  const is30Second = Math.abs(durationHours - 0.008333) < 0.0001;
-
-  // Special probabilities for 30-second testing
-  const testProbabilities = {
-    uncommon: 0.25, // 25%
-    rare: 0.125, // 12.5%
-    legendary: 0.05, // 5%
-  };
+  const is30Second = Math.abs(durationHours - DURATION_30_SECONDS_HOURS) < FLOAT_COMPARISON_TOLERANCE;
 
   // Get duration multiplier
+  interface DurationConfig {
+    hours: number;
+    multiplier: number;
+  }
+
   let durationMultiplier = 1.0;
   if (!is30Second) {
-    const duration = (biomesData.durations as any[]).find((d) => Math.abs(d.hours - durationHours) < 0.0001);
+    const durations = biomesData.durations as DurationConfig[];
+    const duration = durations.find(
+      (d) => Math.abs(d.hours - durationHours) < FLOAT_COMPARISON_TOLERANCE
+    );
     durationMultiplier = duration?.multiplier || 1.0;
   }
 
   // Sort items by rarity (legendary first, then rare, then uncommon)
   const sortedItems = [...biome.items].sort((a, b) => {
-    const rarityOrder = { legendary: 0, rare: 1, uncommon: 2 };
-    return rarityOrder[a.rarity] - rarityOrder[b.rarity];
+    return RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity];
   });
 
   // Check each item in order (rarest first)
@@ -60,7 +66,7 @@ export function rollPartyLoot(biomeId: string, durationHours: number, partySize:
 
     if (is30Second) {
       // Use special test probabilities for 30-second explorations
-      adjustedProbability = testProbabilities[item.rarity];
+      adjustedProbability = TEST_PROBABILITIES[item.rarity];
     } else {
       // Use normal multiplier system for other durations
       adjustedProbability = item.baseProbability * durationMultiplier;

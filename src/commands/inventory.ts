@@ -9,6 +9,7 @@ import {
 } from '../utils/inventoryHelpers';
 import { getRarityColor, getRarityDisplayName } from '../utils/rarityColors';
 import { generateProgressBar, calculatePercentage } from '../utils/progressBar';
+import { RARITY_ORDER } from '../constants';
 
 /**
  * Handle /inventory command
@@ -33,13 +34,30 @@ export async function handleInventoryCommand(interaction: ChatInputCommandIntera
     const longestStreak = await getLongestStreak(userId);
     const highestRarity = getHighestRarity(itemsFound);
 
+    // Debug logging - RAW DATA
+    console.log(`📦 Inventory check for user ${userId}:`);
+    console.log(`   Total explorations: ${totalExplorations}`);
+    console.log(`   Items found count: ${itemsFound.length}`);
+    console.log(`   Items array type: ${Array.isArray(itemsFound) ? 'ARRAY' : typeof itemsFound}`);
+    console.log(`   Raw items:`, JSON.stringify(itemsFound, null, 2));
+    if (itemsFound.length > 0) {
+      console.log(`   Items:`, itemsFound.map(i => `${i?.name || 'NO NAME'} (${i?.rarity || 'NO RARITY'}) from ${i?.biome || 'NO BIOME'}`).join(', '));
+    }
+
     // Build item counts (includes all items, even if count is 0)
     const itemCounts = buildItemCounts(itemsFound);
+    
+    // Debug logging - AFTER BUILD
+    console.log(`   Built ${itemCounts.length} item counts`);
+    itemCounts.forEach(item => {
+      if (item.count > 0) {
+        console.log(`     - ${item.name}: ${item.count}x (${item.rarity})`);
+      }
+    });
 
     // Sort items by rarity (legendary first, then rare, then uncommon)
-    const rarityOrder: Record<string, number> = { legendary: 0, rare: 1, uncommon: 2 };
     itemCounts.sort((a, b) => {
-      const rarityDiff = (rarityOrder[a.rarity] ?? 999) - (rarityOrder[b.rarity] ?? 999);
+      const rarityDiff = (RARITY_ORDER[a.rarity] ?? 999) - (RARITY_ORDER[b.rarity] ?? 999);
       if (rarityDiff !== 0) return rarityDiff;
       return a.name.localeCompare(b.name);
     });
@@ -50,9 +68,19 @@ export async function handleInventoryCommand(interaction: ChatInputCommandIntera
       .setColor(getRarityColor(highestRarity || 'uncommon'))
       .setTimestamp();
 
-    // Build item list
-    const itemLines = itemCounts.map(formatItemLine);
-    embed.setDescription(itemLines.join('\n'));
+    // Filter out items with 0 count for display
+    const itemsToDisplay = itemCounts.filter(item => item.count > 0);
+    
+    if (itemsToDisplay.length === 0) {
+      embed.setDescription('You have no items yet. Go explore to find some!');
+    } else {
+      // Build item list
+      const itemLines = itemsToDisplay.map(formatItemLine);
+      embed.setDescription(itemLines.join('\n'));
+      
+      // Debug logging
+      console.log(`   Displaying ${itemsToDisplay.length} items with count > 0`);
+    }
 
     // Add stats
     const stats: string[] = [];

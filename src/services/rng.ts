@@ -1,4 +1,10 @@
 import biomesData from '../data/biomes.json';
+import {
+  DURATION_30_SECONDS_HOURS,
+  FLOAT_COMPARISON_TOLERANCE,
+  RARITY_ORDER,
+  TEST_PROBABILITIES,
+} from '../constants';
 
 interface Biome {
   id: string;
@@ -32,19 +38,11 @@ export function discoverItem(biomeId: string, durationHours: number): {
   }
 
   // Check if this is a 30-second exploration (for testing with special probabilities)
-  const is30Second = Math.abs(durationHours - 0.008333) < 0.0001;
-
-  // Special probabilities for 30-second testing
-  const testProbabilities = {
-    uncommon: 0.25,   // 25%
-    rare: 0.125,      // 12.5%
-    legendary: 0.05   // 5%
-  };
+  const is30Second = Math.abs(durationHours - DURATION_30_SECONDS_HOURS) < FLOAT_COMPARISON_TOLERANCE;
 
   // Sort items by rarity (legendary first, then rare, then uncommon)
   const sortedItems = [...biome.items].sort((a, b) => {
-    const rarityOrder = { legendary: 0, rare: 1, uncommon: 2 };
-    return rarityOrder[a.rarity] - rarityOrder[b.rarity];
+    return RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity];
   });
 
   // Check each item in order (rarest first)
@@ -53,11 +51,11 @@ export function discoverItem(biomeId: string, durationHours: number): {
     
     if (is30Second) {
       // Use special test probabilities for 30-second explorations
-      adjustedProbability = testProbabilities[item.rarity];
+      adjustedProbability = TEST_PROBABILITIES[item.rarity];
     } else {
       // Use normal multiplier system for other durations
       const duration = (biomesData.durations as Duration[]).find(d => 
-        Math.abs(d.hours - durationHours) < 0.0001
+        Math.abs(d.hours - durationHours) < FLOAT_COMPARISON_TOLERANCE
       );
       if (!duration) {
         throw new Error(`Duration ${durationHours} hours not found`);
@@ -99,7 +97,7 @@ export function getAllBiomes(): Biome[] {
 export function getDurationMultiplier(durationHours: number): number {
   // Find duration (use approximate match for floating point comparison)
   const duration = (biomesData.durations as Duration[]).find(d => 
-    Math.abs(d.hours - durationHours) < 0.0001
+    Math.abs(d.hours - durationHours) < FLOAT_COMPARISON_TOLERANCE
   );
   return duration?.multiplier || 1.0;
 }

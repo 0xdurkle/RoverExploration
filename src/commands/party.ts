@@ -1,4 +1,14 @@
-import { ChatInputCommandInteraction, EmbedBuilder, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import {
+  ChatInputCommandInteraction,
+  EmbedBuilder,
+  SlashCommandBuilder,
+  SlashCommandSubcommandsOnlyBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  TextChannel,
+  Client,
+} from 'discord.js';
 import { createParty } from '../services/partyService';
 import { getAllBiomes } from '../services/rng';
 import { getCooldownRemaining } from '../services/cooldownService';
@@ -92,7 +102,7 @@ export async function handlePartyCreate(interaction: ChatInputCommandInteraction
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(joinButton);
 
     // Send public message first
-    const message = await (publicChannel as any).send({
+    const message = await (publicChannel as TextChannel).send({
       embeds: [embed],
       components: [row],
     });
@@ -120,10 +130,13 @@ export async function handlePartyCreate(interaction: ChatInputCommandInteraction
       components: [updatedRow],
     });
 
-    // Schedule party start after 60 seconds
-    setTimeout(async () => {
-      await startPartyExpedition(interaction.client, party.id);
-    }, 60000);
+    // Schedule party start after timeout
+    const { PARTY_JOIN_TIMEOUT_MS } = await import('../constants');
+    setTimeout(() => {
+      startPartyExpedition(interaction.client, party.id).catch((error) => {
+        console.error(`Error in party expedition start timer for ${party.id}:`, error);
+      });
+    }, PARTY_JOIN_TIMEOUT_MS);
 
     await interaction.editReply({
       content: '✅ Party expedition created! The join window is open for 60 seconds.',
@@ -139,13 +152,10 @@ export async function handlePartyCreate(interaction: ChatInputCommandInteraction
 /**
  * Start party expedition after 60 seconds
  */
-async function startPartyExpedition(client: any, partyId: string): Promise<void> {
-  const { getParty, startParty, removeParty } = await import('../services/partyService');
+async function startPartyExpedition(client: Client, partyId: string): Promise<void> {
+  const { getParty, startParty } = await import('../services/partyService');
   const { rollPartyLoot } = await import('../services/partyLootService');
   const { createExploration } = await import('../db/models');
-  const { saveUserWallet } = await import('../db/models');
-  const { getRarityEmoji } = await import('../services/rng');
-  const { getReturnWithItemMessage, getReturnEmptyMessage } = await import('../utils/messageVariations');
 
   const party = getParty(partyId);
   if (!party || party.started) {
@@ -155,6 +165,10 @@ async function startPartyExpedition(client: any, partyId: string): Promise<void>
   startParty(partyId);
 
   try {
+    if (!party.channelId) {
+      console.error(`Party ${partyId} has no channelId`);
+      return;
+    }
     const channel = await client.channels.fetch(party.channelId);
     if (!channel || !channel.isTextBased()) return;
 
@@ -167,10 +181,18 @@ async function startPartyExpedition(client: any, partyId: string): Promise<void>
       .setColor(0x5865f2)
       .setTimestamp();
 
-    await (channel as any).messages.edit(party.messageId!, {
-      embeds: [embed],
-      components: [],
-    });
+    const textChannel = channel as TextChannel;
+    if (party.messageId) {
+      try {
+        const originalMessage = await textChannel.messages.fetch(party.messageId);
+        await originalMessage.edit({
+          embeds: [embed],
+          components: [],
+        });
+      } catch (error) {
+        console.error(`Error updating party message ${party.messageId}:`, error);
+      }
+    }
 
     // Post departure message
     const departureEmbed = new EmbedBuilder()
@@ -179,19 +201,20 @@ async function startPartyExpedition(client: any, partyId: string): Promise<void>
       )
       .setColor(0x5865f2);
 
-    await (channel as any).send({ embeds: [departureEmbed] });
+    await textChannel.send({ embeds: [departureEmbed] });
 
     // Roll for shared loot (do it once for the whole party)
     const partySize = party.joinedUsers.length;
     const lootResult = rollPartyLoot(party.biome, party.durationHours, partySize);
 
     // Calculate end time
+    const { HOURS_TO_MILLISECONDS } = await import('../constants');
     const startedAt = new Date();
-    const endsAt = new Date(startedAt.getTime() + party.durationHours * 60 * 60 * 1000);
+    const endsAt = new Date(startedAt.getTime() + party.durationHours * HOURS_TO_MILLISECONDS);
 
     // Store the loot result in the party for later
-    (party as any).lootResult = lootResult;
-    (party as any).endsAt = endsAt;
+    party.lootResult = lootResult;
+    party.endsAt = endsAt;
 
     // Create exploration for each party member
     const explorationIds: number[] = [];
@@ -199,7 +222,7 @@ async function startPartyExpedition(client: any, partyId: string): Promise<void>
       const exploration = await createExploration(member.userId, party.biome, party.durationHours);
       explorationIds.push(exploration.id);
     }
-    (party as any).explorationIds = explorationIds;
+    party.explorationIds = explorationIds;
 
     // Store party completion data
     party.completed = false;
@@ -207,8 +230,10 @@ async function startPartyExpedition(client: any, partyId: string): Promise<void>
     // Schedule completion check
     const timeUntilCompletion = endsAt.getTime() - Date.now();
     if (timeUntilCompletion > 0) {
-      setTimeout(async () => {
-        await completePartyExpedition(client, partyId);
+      setTimeout(() => {
+        completePartyExpedition(client, partyId).catch((error) => {
+          console.error(`Error in party expedition completion timer for ${partyId}:`, error);
+        });
       }, timeUntilCompletion);
     } else {
       await completePartyExpedition(client, partyId);
@@ -221,10 +246,9 @@ async function startPartyExpedition(client: any, partyId: string): Promise<void>
 /**
  * Complete party expedition and post results
  */
-async function completePartyExpedition(client: any, partyId: string): Promise<void> {
+async function completePartyExpedition(client: Client, partyId: string): Promise<void> {
   const { getParty, removeParty } = await import('../services/partyService');
   const { completeExploration } = await import('../db/models');
-  const { getRarityEmoji } = await import('../services/rng');
 
   const party = getParty(partyId);
   if (!party) {
@@ -233,6 +257,10 @@ async function completePartyExpedition(client: any, partyId: string): Promise<vo
   }
 
   try {
+    if (!party.channelId) {
+      console.error(`Party ${partyId} has no channelId`);
+      return;
+    }
     const channel = await client.channels.fetch(party.channelId);
     if (!channel || !channel.isTextBased()) {
       console.log(`Channel ${party.channelId} not found for party ${partyId}`);
@@ -240,8 +268,8 @@ async function completePartyExpedition(client: any, partyId: string): Promise<vo
     }
 
     // Get the loot result that was stored when party started
-    const lootResult = (party as any).lootResult;
-    const explorationIds = (party as any).explorationIds || [];
+    const lootResult = party.lootResult;
+    const explorationIds = party.explorationIds || [];
 
     // Create item found object if loot was discovered
     const itemFound = lootResult
@@ -265,23 +293,24 @@ async function completePartyExpedition(client: any, partyId: string): Promise<vo
     console.log(`✅ Completed party expedition ${partyId}. Item: ${itemFound ? itemFound.name : 'None'}`);
 
     // Post final result
+    const textChannel = channel as TextChannel;
     const userMentions = party.joinedUsers.map((u) => `<@${u.userId}>`).join(' ');
 
     if (itemFound) {
-      const emoji = getRarityEmoji(itemFound.rarity);
       const message = `💎 ${userMentions} return from the **${party.biomeName}** and discovered the **${itemFound.name}** (${itemFound.rarity})!`;
-      await (channel as any).send(message);
+      await textChannel.send(message);
     } else {
       const message = `❌ ${userMentions} return from the **${party.biomeName}** empty-handed.`;
-      await (channel as any).send(message);
+      await textChannel.send(message);
     }
 
     party.completed = true;
     
     // Cleanup after a delay
+    const { PARTY_CLEANUP_DELAY_MS } = await import('../constants');
     setTimeout(() => {
       removeParty(partyId);
-    }, 300000); // Remove after 5 minutes
+    }, PARTY_CLEANUP_DELAY_MS);
   } catch (error) {
     console.error(`Error completing party expedition ${partyId}:`, error);
   }
@@ -290,8 +319,6 @@ async function completePartyExpedition(client: any, partyId: string): Promise<vo
 /**
  * Get party command builder for registration
  */
-import { SlashCommandSubcommandsOnlyBuilder } from 'discord.js';
-
 export function getPartyCommandBuilder(): SlashCommandSubcommandsOnlyBuilder {
   return new SlashCommandBuilder()
     .setName('party')

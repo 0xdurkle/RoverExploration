@@ -114,19 +114,24 @@ client.on(Events.Error, (error) => {
   console.error('❌ Discord client error:', error);
 });
 
-process.on('SIGINT', async () => {
-  console.log('\n🛑 Shutting down...');
-  await closeDatabase();
-  client.destroy();
-  process.exit(0);
-});
+/**
+ * Graceful shutdown handler
+ */
+async function shutdown(signal: string): Promise<void> {
+  console.log(`\n🛑 Received ${signal}, shutting down gracefully...`);
+  try {
+    await closeDatabase();
+    client.destroy();
+    console.log('✅ Shutdown complete');
+    process.exit(0);
+  } catch (error) {
+    console.error('❌ Error during shutdown:', error);
+    process.exit(1);
+  }
+}
 
-process.on('SIGTERM', async () => {
-  console.log('\n🛑 Shutting down...');
-  await closeDatabase();
-  client.destroy();
-  process.exit(0);
-});
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 // Login
 const token = process.env.DISCORD_BOT_TOKEN;

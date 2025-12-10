@@ -5,12 +5,10 @@
 
 import { Party, PartyMember } from '../types/party';
 import { getBiome } from './rng';
+import { MAX_PARTY_SIZE, PARTY_JOIN_TIMEOUT_MS } from '../constants';
 
 // Store active parties in memory (auto-cleanup after completion)
 const activeParties = new Map<string, Party>();
-
-const MAX_PARTY_SIZE = 5;
-const PARTY_JOIN_TIMEOUT_MS = 60000; // 60 seconds
 
 /**
  * Create a new party
@@ -129,6 +127,9 @@ export function startParty(partyId: string): void {
 export function removeParty(partyId: string): void {
   activeParties.delete(partyId);
 }
+
+// Export MAX_PARTY_SIZE for use in other modules
+export { MAX_PARTY_SIZE };
 
 /**
  * Get all expired parties that need to start

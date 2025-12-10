@@ -44,6 +44,13 @@ export async function finishExploration(
   let itemFound: ItemFound | null = null;
 
   if (discovered) {
+    // Validate that the discovered rarity is valid
+    const validRarities: Array<'uncommon' | 'rare' | 'legendary'> = ['uncommon', 'rare', 'legendary'];
+    if (!validRarities.includes(discovered.rarity)) {
+      console.error(`❌ Invalid rarity "${discovered.rarity}" for item "${discovered.name}"`);
+      throw new Error(`Invalid rarity "${discovered.rarity}" for item "${discovered.name}"`);
+    }
+    
     itemFound = {
       name: discovered.name,
       rarity: discovered.rarity,
