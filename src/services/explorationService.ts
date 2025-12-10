@@ -38,7 +38,54 @@ export async function finishExploration(
   biome: string,
   durationHours: number
 ): Promise<ItemFound | null> {
-  // Discover item using RNG
+  // CRITICAL: Check if exploration already has an item determined
+  // This prevents re-rolling if the cron job processes it multiple times
+  const { getDb } = await import('../db/connection');
+  const db = getDb();
+  const existingExploration = await db.query(
+    `SELECT item_found, completed FROM explorations WHERE id = $1`,
+    [explorationId]
+  );
+
+  if (existingExploration.rows[0]) {
+    const existing = existingExploration.rows[0];
+    
+    // If already completed, return the existing item
+    if (existing.completed && existing.item_found) {
+      const itemData = typeof existing.item_found === 'string' 
+        ? JSON.parse(existing.item_found) 
+        : existing.item_found;
+      console.log(`⚠️ Exploration ${explorationId} already completed with item: ${itemData.name} (${itemData.rarity})`);
+      return {
+        name: itemData.name,
+        rarity: itemData.rarity,
+        biome: itemData.biome || biome,
+        found_at: itemData.found_at ? new Date(itemData.found_at) : new Date(),
+      };
+    }
+    
+    // If item was already determined but not completed, use it
+    if (existing.item_found && !existing.completed) {
+      const itemData = typeof existing.item_found === 'string' 
+        ? JSON.parse(existing.item_found) 
+        : existing.item_found;
+      console.log(`⚠️ Exploration ${explorationId} already has item determined: ${itemData.name} (${itemData.rarity}), completing now...`);
+      await completeExploration(explorationId, {
+        name: itemData.name,
+        rarity: itemData.rarity,
+        biome: itemData.biome || biome,
+        found_at: itemData.found_at ? new Date(itemData.found_at) : new Date(),
+      });
+      return {
+        name: itemData.name,
+        rarity: itemData.rarity,
+        biome: itemData.biome || biome,
+        found_at: itemData.found_at ? new Date(itemData.found_at) : new Date(),
+      };
+    }
+  }
+
+  // Discover item using RNG (only if not already determined)
   const discovered = discoverItem(biome, durationHours);
 
   let itemFound: ItemFound | null = null;

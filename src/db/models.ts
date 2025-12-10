@@ -105,13 +105,46 @@ export async function completeExploration(
   try {
     console.log(`🔧 completeExploration: Starting for exploration ${explorationId}, itemFound:`, itemFound ? JSON.stringify(itemFound) : 'null');
     
-    await db.query(
-      `UPDATE explorations
-       SET completed = TRUE, item_found = $1
-       WHERE id = $2`,
-      [itemFound ? JSON.stringify(itemFound) : null, explorationId]
-    );
-    console.log(`   ✅ Updated exploration ${explorationId} in database`);
+    // Use a transaction to ensure atomicity
+    await db.query('BEGIN');
+    
+    try {
+      // First, update the exploration record
+      const updateResult = await db.query(
+        `UPDATE explorations
+         SET completed = TRUE, item_found = $1
+         WHERE id = $2 AND completed = FALSE
+         RETURNING user_id, ends_at`,
+        [itemFound ? JSON.stringify(itemFound) : null, explorationId]
+      );
+      
+      if (updateResult.rows.length === 0) {
+        // Exploration was already completed, check what's in there
+        const existing = await db.query(
+          `SELECT item_found, completed FROM explorations WHERE id = $1`,
+          [explorationId]
+        );
+        if (existing.rows[0]?.completed) {
+          console.log(`   ⚠️ Exploration ${explorationId} was already completed, skipping`);
+          await db.query('COMMIT');
+          return;
+        }
+        throw new Error(`Exploration ${explorationId} not found or already processing`);
+      }
+      
+      console.log(`   ✅ Updated exploration ${explorationId} in database`);
+      
+      const { user_id, ends_at } = updateResult.rows[0];
+      
+      // Then update user profile
+      await updateUserProfile(user_id, ends_at, itemFound);
+      
+      await db.query('COMMIT');
+      console.log(`   ✅ Transaction committed for exploration ${explorationId}`);
+    } catch (error) {
+      await db.query('ROLLBACK');
+      throw error;
+    }
 
     // Update user profile
     const exploration = await db.query(
