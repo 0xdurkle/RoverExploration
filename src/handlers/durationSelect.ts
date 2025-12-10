@@ -6,6 +6,12 @@ import { getExplorationStartMessage } from '../utils/messageVariations';
 import { HOURS_TO_MILLISECONDS } from '../constants';
 import { safeDeferUpdate, safeEditReply, safeFollowUp } from '../utils/interactionHelpers';
 
+// Note: This handler includes multiple layers of duplicate prevention:
+// 1. In-memory processing locks (interaction ID and user ID)
+// 2. Cooldown service check
+// 3. Direct database query before creating exploration
+// 4. Post-creation verification
+
 // Track processing interactions to prevent duplicates
 const processingInteractions = new Set<string>();
 const processingUsers = new Map<string, number>(); // Map user ID to timestamp
