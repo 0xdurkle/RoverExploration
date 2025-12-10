@@ -22,10 +22,11 @@ export async function initDatabase(): Promise<void> {
   }
 
   // Determine SSL settings
-  // Supabase always requires SSL, other cloud providers in production, localhost never needs it
+  // Supabase and Railway always require SSL, localhost never needs it
   const isLocalhost = databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1');
   const isSupabase = databaseUrl.includes('supabase');
-  const needsSSL = isSupabase || (!isLocalhost && process.env.NODE_ENV === 'production');
+  const isRailway = databaseUrl.includes('railway.app') || databaseUrl.includes('railway.internal');
+  const needsSSL = isSupabase || isRailway || (!isLocalhost && process.env.NODE_ENV === 'production');
 
   // Create PostgreSQL connection pool
   pool = new Pool({
