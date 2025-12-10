@@ -21,6 +21,10 @@ export async function initDatabase(): Promise<void> {
     throw new Error('DATABASE_URL must be a PostgreSQL connection string (starts with postgresql://)');
   }
 
+  // Log the connection attempt (without sensitive info)
+  const urlForLogging = databaseUrl.replace(/:[^:@]+@/, ':****@'); // Hide password
+  console.log(`🔌 Attempting to connect to database: ${urlForLogging.substring(0, 50)}...`);
+
   // Determine SSL settings
   // Supabase and Railway always require SSL, localhost never needs it
   const isLocalhost = databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1');
