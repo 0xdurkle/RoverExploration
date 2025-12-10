@@ -63,7 +63,7 @@ export async function handleInventoryCommand(interaction: ChatInputCommandIntera
 
     // Build embed
     const embed = new EmbedBuilder()
-      .setTitle('🌿 Your Underlog Inventory')
+      .setTitle('Your Underlog Inventory')
       .setColor(getRarityColor('uncommon'))
       .setTimestamp();
 
