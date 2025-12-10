@@ -179,8 +179,7 @@ RoverExploration/
 │   ├── commands/
 │   │   └── explore.ts          # /explore slash command
 │   ├── handlers/
-│   │   ├── biomeSelect.ts      # Biome button handler
-│   │   └── durationSelect.ts   # Duration button handler
+│   │   └── partyJoin.ts         # Party join button handler
 │   ├── services/
 │   │   ├── explorationService.ts  # Core game logic
 │   │   ├── cooldownService.ts     # Cooldown checks
