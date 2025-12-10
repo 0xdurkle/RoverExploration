@@ -164,9 +164,22 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
     }
 
     // CRITICAL: Send public message ONLY ONCE per exploration ID
-    // Check if message was already sent for this exploration ID (atomic check)
+    // Use atomic check-and-set pattern to prevent race conditions
     const channelId = process.env.DISCORD_CHANNEL_ID;
     if (channelId && explorationId) {
+      // CRITICAL: Atomic check-and-set - if already in set, skip immediately
+      // This must happen BEFORE any async operations to prevent race conditions
+      if (sentMessages.has(explorationId)) {
+        console.log(`⏱️ [DURATION_SELECT] ⚠️ Message already sent for exploration ${explorationId}, skipping duplicate`);
+        console.log(`⏱️ [DURATION_SELECT] Interaction ID: ${interaction.id}, User: ${userId}`);
+        return;
+      }
+      
+      // Mark as sent IMMEDIATELY (before any async operations) to prevent race conditions
+      // This ensures that even if handler is called twice concurrently, only one will proceed
+      console.log(`⏱️ [DURATION_SELECT] Marking exploration ${explorationId} as sent (interaction ${interaction.id})`);
+      sentMessages.add(explorationId);
+      
       // Double-check: verify exploration exists and was just created
       const { getDb } = await import('../db/connection');
       const db = getDb();
@@ -177,17 +190,10 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
       
       if (verifyExploration.rows.length === 0) {
         console.error(`⏱️ [DURATION_SELECT] ❌ Exploration ${explorationId} not found in database, not sending message`);
+        // Remove from sent set since we didn't actually send
+        sentMessages.delete(explorationId);
         return;
       }
-      
-      // Check if message was already sent for this exploration ID
-      if (sentMessages.has(explorationId)) {
-        console.log(`⏱️ [DURATION_SELECT] ⚠️ Message already sent for exploration ${explorationId}, skipping duplicate`);
-        return;
-      }
-      
-      // Mark as sent BEFORE sending (prevents race condition)
-      sentMessages.add(explorationId);
       
       try {
         console.log(`⏱️ [DURATION_SELECT] Sending public message for exploration ${explorationId}`);
