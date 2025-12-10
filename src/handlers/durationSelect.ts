@@ -6,6 +6,8 @@ import { getExplorationStartMessage } from '../utils/messageVariations';
 import { HOURS_TO_MILLISECONDS } from '../constants';
 import { safeDeferUpdate, safeEditReply, safeFollowUp } from '../utils/interactionHelpers';
 
+// Note: This handler manages exploration creation and public messaging
+
 /**
  * Handle duration selection button click
  */
