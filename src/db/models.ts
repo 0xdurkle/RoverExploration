@@ -136,13 +136,23 @@ export async function completeExploration(
       
       const { user_id, ends_at } = updateResult.rows[0];
       
-      // Then update user profile
-      await updateUserProfile(user_id, ends_at, itemFound);
+      // Then update user profile (this must succeed or we rollback)
+      try {
+        await updateUserProfile(user_id, ends_at, itemFound);
+        console.log(`   ✅ User profile updated successfully`);
+      } catch (profileError) {
+        console.error(`   ❌ Error updating user profile:`, profileError);
+        throw profileError; // This will trigger rollback
+      }
       
       await db.query('COMMIT');
       console.log(`   ✅ Transaction committed for exploration ${explorationId}`);
     } catch (error) {
-      await db.query('ROLLBACK');
+      console.error(`   ❌ Error in transaction for exploration ${explorationId}, rolling back:`, error);
+      console.error(`   Error stack:`, error instanceof Error ? error.stack : String(error));
+      await db.query('ROLLBACK').catch(rollbackError => {
+        console.error(`   ❌ Failed to rollback transaction:`, rollbackError);
+      });
       throw error;
     }
 
