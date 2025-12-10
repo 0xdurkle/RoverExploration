@@ -521,3 +521,56 @@ export async function getUserWalletByAddress(walletAddress: string): Promise<Use
 
   return result.rows[0] || null;
 }
+
+/**
+ * End all active explorations (mark as completed)
+ * This is useful for resetting the system or clearing stuck explorations
+ */
+export async function endAllExplorations(): Promise<{ count: number; explorations: Exploration[] }> {
+  const db = getDb();
+
+  try {
+    console.log(`\n🛑 [END_ALL_EXPLORATIONS] ==========================================`);
+    console.log(`🛑 [END_ALL_EXPLORATIONS] Starting to end all active explorations...`);
+    
+    // First, get all incomplete explorations
+    const getIncomplete = await db.query(
+      `SELECT * FROM explorations WHERE completed = FALSE ORDER BY id ASC`
+    );
+    
+    console.log(`🛑 [END_ALL_EXPLORATIONS] Found ${getIncomplete.rows.length} incomplete explorations`);
+    
+    if (getIncomplete.rows.length === 0) {
+      console.log(`🛑 [END_ALL_EXPLORATIONS] No incomplete explorations to end`);
+      console.log(`🛑 [END_ALL_EXPLORATIONS] ==========================================\n`);
+      return { count: 0, explorations: [] };
+    }
+
+    // Log details of each exploration
+    getIncomplete.rows.forEach((exp, idx) => {
+      console.log(`🛑 [END_ALL_EXPLORATIONS] Exploration ${idx + 1}: ID=${exp.id}, User=${exp.user_id}, Biome=${exp.biome}, EndsAt=${exp.ends_at}, HasItem=${!!exp.item_found}`);
+    });
+
+    // Mark all as completed
+    // If they don't have an item_found, set it to NULL
+    const updateResult = await db.query(
+      `UPDATE explorations 
+       SET completed = TRUE, 
+           item_found = COALESCE(item_found, NULL)
+       WHERE completed = FALSE
+       RETURNING *`
+    );
+
+    console.log(`🛑 [END_ALL_EXPLORATIONS] ✅ Updated ${updateResult.rows.length} explorations`);
+    console.log(`🛑 [END_ALL_EXPLORATIONS] ==========================================\n`);
+
+    return {
+      count: updateResult.rows.length,
+      explorations: updateResult.rows as Exploration[]
+    };
+  } catch (error) {
+    console.error(`🛑 [END_ALL_EXPLORATIONS] ❌ Error ending all explorations:`, error);
+    console.error(`🛑 [END_ALL_EXPLORATIONS] Error stack:`, error instanceof Error ? error.stack : String(error));
+    throw error;
+  }
+}
