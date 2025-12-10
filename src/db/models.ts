@@ -199,186 +199,119 @@ async function updateUserProfile(
     console.log(`📋 [UPDATE_USER_PROFILE] lastExplorationEnd:`, lastExplorationEnd);
     console.log(`📋 [UPDATE_USER_PROFILE] itemFound:`, itemFound ? JSON.stringify(itemFound, null, 2) : 'null');
     
-    // Check if profile exists
-    console.log(`📋 [UPDATE_USER_PROFILE] Checking if profile exists for user ${userId}...`);
+    // Get existing profile to build the items array
+    console.log(`📋 [UPDATE_USER_PROFILE] Getting existing profile for user ${userId}...`);
     const existing = await db.query(
-      `SELECT * FROM user_profiles WHERE user_id = $1`,
+      `SELECT items_found, total_explorations FROM user_profiles WHERE user_id = $1`,
       [userId]
     );
-    console.log(`📋 [UPDATE_USER_PROFILE] Profile query result:`, {
-      found: existing.rows.length > 0,
-      rowCount: existing.rows.length
-    });
-
+    
+    // Build items array from existing profile or start fresh
+    let itemsFound: any[] = [];
+    let oldExplorationCount = 0;
+    
     if (existing.rows[0]) {
       console.log(`📋 [UPDATE_USER_PROFILE] ✅ Profile exists for user ${userId}`);
-      console.log(`📋 [UPDATE_USER_PROFILE] Current total_explorations:`, existing.rows[0].total_explorations);
-      console.log(`📋 [UPDATE_USER_PROFILE] Current items_found type:`, typeof existing.rows[0].items_found);
-      console.log(`📋 [UPDATE_USER_PROFILE] Current items_found isArray:`, Array.isArray(existing.rows[0].items_found));
-      console.log(`📋 [UPDATE_USER_PROFILE] Current items_found value:`, existing.rows[0].items_found);
+      oldExplorationCount = existing.rows[0].total_explorations || 0;
+      console.log(`📋 [UPDATE_USER_PROFILE] Current total_explorations: ${oldExplorationCount}`);
       
-      // Update existing profile
-      // PostgreSQL JSONB is automatically parsed, but handle null/undefined cases
-      let itemsFound: any[] = [];
       const rawItemsFound = existing.rows[0].items_found;
-    
-      console.log(`📋 [UPDATE_USER_PROFILE] Parsing existing items_found...`);
+      console.log(`📋 [UPDATE_USER_PROFILE] Current items_found type:`, typeof rawItemsFound);
+      
+      // Parse existing items
       if (Array.isArray(rawItemsFound)) {
-        itemsFound = [...rawItemsFound]; // Create a copy to avoid mutating
+        itemsFound = [...rawItemsFound];
         console.log(`📋 [UPDATE_USER_PROFILE] Parsed as array: ${itemsFound.length} items`);
       } else if (rawItemsFound && typeof rawItemsFound === 'string') {
-        // Handle case where it's still a string (shouldn't happen but be safe)
-        console.log(`📋 [UPDATE_USER_PROFILE] Parsing from string...`);
         itemsFound = JSON.parse(rawItemsFound);
         console.log(`📋 [UPDATE_USER_PROFILE] Parsed from string: ${itemsFound.length} items`);
       } else if (rawItemsFound) {
-        // Handle other cases
-        console.log(`📋 [UPDATE_USER_PROFILE] Treating as single item object...`);
         itemsFound = [rawItemsFound];
-        console.log(`📋 [UPDATE_USER_PROFILE] Created array with 1 item`);
-      } else {
-        console.log(`📋 [UPDATE_USER_PROFILE] rawItemsFound is null/undefined, starting with empty array`);
+        console.log(`📋 [UPDATE_USER_PROFILE] Treated as single item object`);
       }
-      
-      console.log(`📋 [UPDATE_USER_PROFILE] Current items count: ${itemsFound.length}`);
-      if (itemsFound.length > 0) {
-        console.log(`📋 [UPDATE_USER_PROFILE] Current items:`, itemsFound.map((i: any) => `${i?.name || 'NO_NAME'} (${i?.rarity || 'NO_RARITY'})`).join(', '));
-      }
-
-      if (itemFound) {
-        console.log(`📋 [UPDATE_USER_PROFILE] Processing item to add:`, JSON.stringify(itemFound, null, 2));
-        // Validate rarity before saving
-        const validRarities: Array<'uncommon' | 'rare' | 'legendary'> = ['uncommon', 'rare', 'legendary'];
-        if (!validRarities.includes(itemFound.rarity)) {
-          console.error(`📋 [UPDATE_USER_PROFILE] ❌ Invalid rarity "${itemFound.rarity}" for item "${itemFound.name}" when saving to database`);
-          throw new Error(`Invalid rarity "${itemFound.rarity}" for item "${itemFound.name}"`);
-        }
-        
-        // Ensure itemFound has all required fields
-        const itemToSave: ItemFound = {
-          name: itemFound.name,
-          rarity: itemFound.rarity,
-          biome: itemFound.biome,
-          found_at: itemFound.found_at instanceof Date ? itemFound.found_at : new Date(itemFound.found_at),
-        };
-        console.log(`📋 [UPDATE_USER_PROFILE] Item to save:`, JSON.stringify(itemToSave, null, 2));
-        
-        // Check if item already exists (prevent duplicates from retries)
-        const itemExists = itemsFound.some((item: any) => 
-          item && item.name === itemToSave.name && item.rarity === itemToSave.rarity
-        );
-        
-        if (itemExists) {
-          console.log(`📋 [UPDATE_USER_PROFILE] ⚠️ Item "${itemToSave.name}" already exists in inventory, skipping duplicate`);
-        } else {
-          itemsFound.push(itemToSave);
-          console.log(`📋 [UPDATE_USER_PROFILE] ✅ Added item "${itemToSave.name}" (${itemToSave.rarity}) from ${itemToSave.biome}`);
-        }
-        
-        console.log(`📋 [UPDATE_USER_PROFILE] New total items: ${itemsFound.length}`);
-        console.log(`📋 [UPDATE_USER_PROFILE] Full items array:`, JSON.stringify(itemsFound, null, 2));
-      } else {
-        console.log(`📋 [UPDATE_USER_PROFILE] No item found, only incrementing exploration count`);
-      }
-
-      const itemsJson = JSON.stringify(itemsFound);
-      console.log(`📋 [UPDATE_USER_PROFILE] 💾 Preparing to save: ${itemsFound.length} items, JSON length: ${itemsJson.length}`);
-      console.log(`📋 [UPDATE_USER_PROFILE] JSON to save:`, itemsJson.substring(0, 500) + (itemsJson.length > 500 ? '...' : ''));
-      
-      const oldExplorationCount = existing.rows[0].total_explorations || 0;
-      const newExplorationCount = oldExplorationCount + 1;
-      console.log(`📋 [UPDATE_USER_PROFILE] Old exploration count: ${oldExplorationCount}, will increment to: ${newExplorationCount}`);
-      
-      // Use INSERT ... ON CONFLICT to ensure it always succeeds (handles both create and update)
-      // For INSERT (new profile): set to 1 (this is their first exploration)
-      // For UPDATE (existing profile): increment by 1
-      const updateResult = await db.query(
-        `INSERT INTO user_profiles (user_id, total_explorations, items_found, last_exploration_end)
-         VALUES ($1, 1, $2::jsonb, $3)
-         ON CONFLICT (user_id) 
-         DO UPDATE SET 
-           total_explorations = user_profiles.total_explorations + 1,
-           items_found = $2::jsonb,
-           last_exploration_end = $3
-         RETURNING items_found, total_explorations`,
-        [userId, itemsJson, lastExplorationEnd]
-      );
-      
-      console.log(`📋 [UPDATE_USER_PROFILE] Upsert query executed, rows returned: ${updateResult.rows.length}`);
-      
-      if (updateResult.rows.length === 0) {
-        console.error(`📋 [UPDATE_USER_PROFILE] ❌ Upsert query returned no rows for user ${userId}`);
-        throw new Error(`Failed to upsert user profile for user ${userId}`);
-      }
-      
-      const savedItems = updateResult.rows[0].items_found;
-      const savedCount = Array.isArray(savedItems) ? savedItems.length : 0;
-      const newExplorationCount = updateResult.rows[0].total_explorations;
-      
-      console.log(`📋 [UPDATE_USER_PROFILE] ✅ Updated profile for user ${userId}`);
-      console.log(`📋 [UPDATE_USER_PROFILE] Total explorations: ${oldExplorationCount} → ${newExplorationCount}`);
-      console.log(`📋 [UPDATE_USER_PROFILE] Items saved: ${savedCount}`);
-      console.log(`📋 [UPDATE_USER_PROFILE] Saved items_found type:`, typeof savedItems);
-      console.log(`📋 [UPDATE_USER_PROFILE] Saved items_found isArray:`, Array.isArray(savedItems));
-      
-      // Verify the count was actually incremented (log warning but don't throw - data is saved)
-      if (newExplorationCount !== oldExplorationCount + 1) {
-        console.error(`📋 [UPDATE_USER_PROFILE] ⚠️ WARNING: Exploration count increment mismatch!`);
-        console.error(`📋 [UPDATE_USER_PROFILE] Expected: ${oldExplorationCount + 1}, Got: ${newExplorationCount}`);
-        // Don't throw - the count was incremented, just not by exactly 1 (might be a concurrency issue)
-      } else {
-        console.log(`📋 [UPDATE_USER_PROFILE] ✅ Exploration count incremented correctly: ${oldExplorationCount} → ${newExplorationCount}`);
-      }
-      
-      // Verify item count (log warning but don't throw - might have duplicates or other edge cases)
-      if (savedCount !== itemsFound.length) {
-        console.error(`📋 [UPDATE_USER_PROFILE] ⚠️ WARNING: Item count mismatch!`);
-        console.error(`📋 [UPDATE_USER_PROFILE] Expected ${itemsFound.length} items but database has ${savedCount}`);
-        console.error(`📋 [UPDATE_USER_PROFILE] Expected items:`, JSON.stringify(itemsFound, null, 2));
-        console.error(`📋 [UPDATE_USER_PROFILE] Saved items:`, JSON.stringify(savedItems, null, 2));
-        // Don't throw - items might have been saved, just count is off (could be duplicates)
-      } else {
-        console.log(`📋 [UPDATE_USER_PROFILE] ✅ Item count matches: ${savedCount} items`);
-      }
-      
-      // Note: Verification of items is now done in checkExplorations.ts after transaction commits
-      // This ensures we're reading the committed data
     } else {
-      // Create new profile
-      console.log(`📋 [UPDATE_USER_PROFILE] 📝 Creating NEW profile for user ${userId}`);
-      const itemsFound = itemFound ? [itemFound] : [];
+      console.log(`📋 [UPDATE_USER_PROFILE] 📝 Profile doesn't exist yet, will be created`);
+    }
+    
+    console.log(`📋 [UPDATE_USER_PROFILE] Current items count: ${itemsFound.length}`);
+    if (itemsFound.length > 0) {
+      console.log(`📋 [UPDATE_USER_PROFILE] Current items:`, itemsFound.map((i: any) => `${i?.name || 'NO_NAME'} (${i?.rarity || 'NO_RARITY'})`).join(', '));
+    }
 
-      if (itemFound) {
-        console.log(`📋 [UPDATE_USER_PROFILE] ✅ Creating new profile for user ${userId} with item "${itemFound.name}"`);
-        console.log(`📋 [UPDATE_USER_PROFILE] Item to save:`, JSON.stringify(itemFound, null, 2));
-      } else {
-        console.log(`📋 [UPDATE_USER_PROFILE] ✅ Creating new profile for user ${userId} (no item found)`);
+    // Add new item if found
+    if (itemFound) {
+      console.log(`📋 [UPDATE_USER_PROFILE] Processing item to add:`, JSON.stringify(itemFound, null, 2));
+      
+      // Validate rarity
+      const validRarities: Array<'uncommon' | 'rare' | 'legendary'> = ['uncommon', 'rare', 'legendary'];
+      if (!validRarities.includes(itemFound.rarity)) {
+        console.error(`📋 [UPDATE_USER_PROFILE] ❌ Invalid rarity "${itemFound.rarity}" for item "${itemFound.name}"`);
+        throw new Error(`Invalid rarity "${itemFound.rarity}" for item "${itemFound.name}"`);
       }
-
-      const itemsJson = JSON.stringify(itemsFound);
-      console.log(`📋 [UPDATE_USER_PROFILE] 💾 Inserting profile with ${itemsFound.length} items`);
-      console.log(`📋 [UPDATE_USER_PROFILE] JSON to insert:`, itemsJson);
-
-      const insertResult = await db.query(
-        `INSERT INTO user_profiles (user_id, total_explorations, items_found, last_exploration_end)
-         VALUES ($1, 1, $2::jsonb, $3)
-         RETURNING items_found, total_explorations`,
-        [userId, itemsJson, lastExplorationEnd]
+      
+      // Ensure itemFound has all required fields
+      const itemToSave: ItemFound = {
+        name: itemFound.name,
+        rarity: itemFound.rarity,
+        biome: itemFound.biome,
+        found_at: itemFound.found_at instanceof Date ? itemFound.found_at : new Date(itemFound.found_at),
+      };
+      console.log(`📋 [UPDATE_USER_PROFILE] Item to save:`, JSON.stringify(itemToSave, null, 2));
+      
+      // Check if item already exists (prevent duplicates)
+      const itemExists = itemsFound.some((item: any) => 
+        item && item.name === itemToSave.name && item.rarity === itemToSave.rarity
       );
       
-      console.log(`📋 [UPDATE_USER_PROFILE] Insert query executed, rows returned: ${insertResult.rows.length}`);
-      
-      if (insertResult.rows[0]) {
-        const savedItems = insertResult.rows[0].items_found;
-        const savedCount = Array.isArray(savedItems) ? savedItems.length : 0;
-        console.log(`📋 [UPDATE_USER_PROFILE] ✅ Created profile for user ${userId}`);
-        console.log(`📋 [UPDATE_USER_PROFILE] Total explorations: ${insertResult.rows[0].total_explorations}`);
-        console.log(`📋 [UPDATE_USER_PROFILE] Items saved: ${savedCount}`);
-        console.log(`📋 [UPDATE_USER_PROFILE] Saved items:`, JSON.stringify(savedItems, null, 2));
+      if (itemExists) {
+        console.log(`📋 [UPDATE_USER_PROFILE] ⚠️ Item "${itemToSave.name}" already exists, skipping duplicate`);
       } else {
-        console.error(`📋 [UPDATE_USER_PROFILE] ❌ Insert query returned no rows!`);
-        throw new Error(`Failed to create user profile for user ${userId}`);
+        itemsFound.push(itemToSave);
+        console.log(`📋 [UPDATE_USER_PROFILE] ✅ Added item "${itemToSave.name}" (${itemToSave.rarity})`);
       }
+    } else {
+      console.log(`📋 [UPDATE_USER_PROFILE] No item found, only incrementing exploration count`);
+    }
+
+    const itemsJson = JSON.stringify(itemsFound);
+    console.log(`📋 [UPDATE_USER_PROFILE] 💾 Preparing to save: ${itemsFound.length} items`);
+    console.log(`📋 [UPDATE_USER_PROFILE] Old exploration count: ${oldExplorationCount}, will set to: ${oldExplorationCount + 1}`);
+    
+    // Use INSERT ... ON CONFLICT to handle both create and update atomically
+    // This prevents race conditions and ensures the update always succeeds
+    const result = await db.query(
+      `INSERT INTO user_profiles (user_id, total_explorations, items_found, last_exploration_end)
+       VALUES ($1, 1, $2::jsonb, $3)
+       ON CONFLICT (user_id) 
+       DO UPDATE SET 
+         total_explorations = user_profiles.total_explorations + 1,
+         items_found = $2::jsonb,
+         last_exploration_end = $3
+       RETURNING items_found, total_explorations`,
+      [userId, itemsJson, lastExplorationEnd]
+    );
+    
+    console.log(`📋 [UPDATE_USER_PROFILE] Upsert query executed, rows returned: ${result.rows.length}`);
+    
+    if (result.rows.length === 0) {
+      console.error(`📋 [UPDATE_USER_PROFILE] ❌ Upsert query returned no rows for user ${userId}`);
+      throw new Error(`Failed to upsert user profile for user ${userId}`);
+    }
+    
+    const savedItems = result.rows[0].items_found;
+    const savedCount = Array.isArray(savedItems) ? savedItems.length : 0;
+    const newExplorationCount = result.rows[0].total_explorations;
+    
+    console.log(`📋 [UPDATE_USER_PROFILE] ✅ Profile upserted for user ${userId}`);
+    console.log(`📋 [UPDATE_USER_PROFILE] Total explorations: ${oldExplorationCount} → ${newExplorationCount}`);
+    console.log(`📋 [UPDATE_USER_PROFILE] Items saved: ${savedCount} (expected: ${itemsFound.length})`);
+    
+    // Log warnings if counts don't match (but don't throw - data is saved)
+    if (newExplorationCount !== oldExplorationCount + 1) {
+      console.error(`📋 [UPDATE_USER_PROFILE] ⚠️ WARNING: Exploration count mismatch! Expected ${oldExplorationCount + 1}, got ${newExplorationCount}`);
+    }
+    if (savedCount !== itemsFound.length) {
+      console.error(`📋 [UPDATE_USER_PROFILE] ⚠️ WARNING: Item count mismatch! Expected ${itemsFound.length}, got ${savedCount}`);
     }
     console.log(`📋 [UPDATE_USER_PROFILE] ==========================================\n`);
   } catch (error) {
