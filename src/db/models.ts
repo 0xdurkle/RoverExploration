@@ -322,14 +322,25 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
   // Log what we retrieved
   console.log(`📥 Retrieved profile for user ${userId}: ${itemsFound.length} items from database`);
 
-  // Parse dates in items_found
+  // Parse dates in items_found and normalize biome (convert ID to name)
+  const { getBiome } = await import('../services/rng');
   itemsFound = itemsFound.map((item: any, index: number) => {
     if (!item || typeof item !== 'object') {
       console.error(`❌ Invalid item at index ${index} in database for user ${userId}:`, item);
       return null;
     }
+    
+    // Normalize biome - convert ID to name if needed
+    let biomeName = item.biome || 'Unknown';
+    if (biomeName.includes('_')) {
+      // Likely a biome ID, convert to name
+      const biomeData = getBiome(biomeName);
+      biomeName = biomeData?.name || biomeName;
+    }
+    
     const parsedItem = {
       ...item,
+      biome: biomeName,
       found_at: item.found_at instanceof Date ? item.found_at : new Date(item.found_at),
     };
     console.log(`   Item ${index}: ${parsedItem.name} (${parsedItem.rarity}) from ${parsedItem.biome}`);

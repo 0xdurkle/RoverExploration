@@ -129,7 +129,7 @@ export function buildItemCounts(itemsFound: ItemFound[]): ItemCount[] {
       
       console.log(`     Stored rarity: ${rarity}, stored biome: ${biome}`);
       
-      // Try to find the item in biome data to get display name if biome is an ID
+      // Try to find the item in biome data to get display name and validate biome
       const allItems = getAllItems();
       const biomeItem = allItems.find(item => item.name === itemName);
       console.log(`     Found in biome data: ${biomeItem ? 'YES' : 'NO'}`);
@@ -139,8 +139,14 @@ export function buildItemCounts(itemsFound: ItemFound[]): ItemCount[] {
       
       // Use stored rarity if available, otherwise try biome data, default to 'uncommon'
       const finalRarity = rarity || biomeItem?.rarity || 'uncommon';
-      // Use stored biome if available, otherwise try biome data, otherwise use stored or 'Unknown'
-      const finalBiome = biome || biomeItem?.biome || 'Unknown';
+      // Use stored biome if available and valid, otherwise try biome data, otherwise use stored or 'Unknown'
+      // Normalize biome - if stored biome is an ID (contains underscore), prefer biome data name
+      let finalBiome = biome || biomeItem?.biome || 'Unknown';
+      if (finalBiome.includes('_') && biomeItem) {
+        // Stored biome is an ID but we have biome data, use the name from biome data
+        finalBiome = biomeItem.biome;
+        console.log(`     Normalized biome from ID to name: ${biome} -> ${finalBiome}`);
+      }
       
       // Validate rarity is valid
       const validRarities = ['uncommon', 'rare', 'legendary'];

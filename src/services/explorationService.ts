@@ -55,11 +55,21 @@ export async function finishExploration(
       const itemData = typeof existing.item_found === 'string' 
         ? JSON.parse(existing.item_found) 
         : existing.item_found;
+      
+      // Normalize biome - convert ID to name if needed
+      const { getBiome } = await import('./rng');
+      let biomeName = itemData.biome || biome;
+      // If biome is an ID (contains underscore), convert to name
+      if (biomeName.includes('_')) {
+        const biomeData = getBiome(biomeName);
+        biomeName = biomeData?.name || biomeName;
+      }
+      
       console.log(`⚠️ Exploration ${explorationId} already completed with item: ${itemData.name} (${itemData.rarity})`);
       return {
         name: itemData.name,
         rarity: itemData.rarity,
-        biome: itemData.biome || biome,
+        biome: biomeName,
         found_at: itemData.found_at ? new Date(itemData.found_at) : new Date(),
       };
     }
@@ -69,17 +79,26 @@ export async function finishExploration(
       const itemData = typeof existing.item_found === 'string' 
         ? JSON.parse(existing.item_found) 
         : existing.item_found;
+      // Normalize biome - convert ID to name if needed
+      const { getBiome } = await import('./rng');
+      let biomeName = itemData.biome || biome;
+      // If biome is an ID (contains underscore), convert to name
+      if (biomeName.includes('_')) {
+        const biomeData = getBiome(biomeName);
+        biomeName = biomeData?.name || biomeName;
+      }
+      
       console.log(`⚠️ Exploration ${explorationId} already has item determined: ${itemData.name} (${itemData.rarity}), completing now...`);
       await completeExploration(explorationId, {
         name: itemData.name,
         rarity: itemData.rarity,
-        biome: itemData.biome || biome,
+        biome: biomeName,
         found_at: itemData.found_at ? new Date(itemData.found_at) : new Date(),
       });
       return {
         name: itemData.name,
         rarity: itemData.rarity,
-        biome: itemData.biome || biome,
+        biome: biomeName,
         found_at: itemData.found_at ? new Date(itemData.found_at) : new Date(),
       };
     }
@@ -98,13 +117,18 @@ export async function finishExploration(
       throw new Error(`Invalid rarity "${discovered.rarity}" for item "${discovered.name}"`);
     }
     
+    // Get biome name from biome ID for consistent storage
+    const { getBiome } = await import('./rng');
+    const biomeData = getBiome(biome);
+    const biomeName = biomeData?.name || biome; // Fallback to ID if biome not found
+    
     itemFound = {
       name: discovered.name,
       rarity: discovered.rarity,
-      biome: biome,
+      biome: biomeName, // Store biome name, not ID
       found_at: new Date(),
     };
-    console.log(`🎁 Item discovered: ${itemFound.name} (${itemFound.rarity}) for user ${userId} in ${biome}`);
+    console.log(`🎁 Item discovered: ${itemFound.name} (${itemFound.rarity}) for user ${userId} in ${biomeName}`);
   } else {
     console.log(`📭 No item found for user ${userId} in ${biome}`);
   }

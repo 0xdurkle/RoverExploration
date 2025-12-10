@@ -72,10 +72,19 @@ export async function handleRepairCommand(interaction: ChatInputCommandInteracti
           }
           
           if (itemData && itemData.name && itemData.rarity) {
+            // Normalize biome - convert ID to name if needed
+            let biomeName = itemData.biome || exp.biome;
+            if (biomeName.includes('_')) {
+              // Likely a biome ID, convert to name
+              const { getBiome } = await import('../services/rng');
+              const biomeData = getBiome(biomeName);
+              biomeName = biomeData?.name || biomeName;
+            }
+            
             itemsFromExplorations.push({
               name: itemData.name,
               rarity: itemData.rarity,
-              biome: itemData.biome || exp.biome,
+              biome: biomeName,
               found_at: itemData.found_at ? new Date(itemData.found_at) : new Date(exp.ends_at),
             });
             console.log(`   ✅ Found item: ${itemData.name} (${itemData.rarity}) from exploration ${exp.id}`);
