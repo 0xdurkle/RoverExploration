@@ -41,6 +41,7 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
   const userId = interaction.user.id;
   const callId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   let exploration: any = null; // Declare at function scope so it's accessible in catch block
+  let explorationId: number | undefined = undefined; // Declare at function scope to avoid redeclaration errors
   
   try {
     console.log(`⏱️ [DURATION_SELECT] ==========================================`);
@@ -284,12 +285,15 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
     
     // Clear processing flag after completion (only if we successfully sent the message)
     // We keep it set until message is sent to prevent duplicates
-    const explorationId = exploration?.id;
     if (explorationId) {
       // Only clear if message was sent (it's in sentMessages)
       if (sentMessages.has(explorationId)) {
         processingExplorations.delete(explorationId);
         console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Cleared processing flag for exploration ${explorationId} (message sent)`);
+      } else {
+        // Message wasn't sent, but clear the flag anyway to prevent blocking
+        processingExplorations.delete(explorationId);
+        console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Cleared processing flag for exploration ${explorationId} (no message sent)`);
       }
     }
     
@@ -298,8 +302,11 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
     // Always clear user lock on error
     usersCreatingExplorations.delete(userId);
     
-    // Try to clear processing flag on error - we need to check if exploration was created
-    // We'll look for explorationId in the scope or check the error
+    // Clear processing flag on error if exploration was created
+    if (exploration && exploration.id) {
+      processingExplorations.delete(exploration.id);
+      console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Cleared processing flag for exploration ${exploration.id} (error occurred)`);
+    }
     
     console.error(`⏱️ [DURATION_SELECT] ❌ Error starting exploration:`, error);
     console.error(`⏱️ [DURATION_SELECT] Error stack:`, error instanceof Error ? error.stack : String(error));
