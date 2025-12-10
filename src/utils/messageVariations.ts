@@ -99,30 +99,37 @@ export function getReturnWithItemMessage(
   userMention: string,
   biomeName: string,
   itemName: string,
-  rarity: string
+  rarity: string,
+  distanceKm: number
 ): string {
   const variation = RETURNED_WITH_ITEM_VARIATIONS[
     Math.floor(Math.random() * RETURNED_WITH_ITEM_VARIATIONS.length)
   ];
   
-  return variation
+  const baseMessage = variation
     .replace(/{emoji}/g, emoji)
     .replace(/{userMention}/g, userMention)
     .replace(/{biomeName}/g, biomeName)
     .replace(/{itemName}/g, itemName)
     .replace(/{rarity}/g, rarity);
+  
+  // Append distance at the end
+  return `${baseMessage} (+${distanceKm.toFixed(2)} KM)`;
 }
 
 /**
  * Get a random return empty-handed message
  */
-export function getReturnEmptyMessage(userMention: string, biomeName: string): string {
+export function getReturnEmptyMessage(userMention: string, biomeName: string, distanceKm: number): string {
   const variation = RETURNED_EMPTY_VARIATIONS[
     Math.floor(Math.random() * RETURNED_EMPTY_VARIATIONS.length)
   ];
   
-  return variation
+  const baseMessage = variation
     .replace(/{userMention}/g, userMention)
     .replace(/{biomeName}/g, biomeName);
+  
+  // Append distance at the end
+  return `${baseMessage} (+${distanceKm.toFixed(2)} KM)`;
 }
 
