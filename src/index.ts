@@ -3,9 +3,11 @@ import { config } from 'dotenv';
 import * as cron from 'node-cron';
 import { initDatabase, closeDatabase } from './db/connection';
 import { handleExploreCommand } from './commands/explore';
+import { handleWalletSet, handleWalletView, getWalletCommandBuilder } from './commands/wallet';
 import { handleBiomeSelect } from './handlers/biomeSelect';
 import { handleDurationSelect } from './handlers/durationSelect';
 import { checkAndProcessExplorations } from './jobs/checkExplorations';
+import { SlashCommandBuilder } from 'discord.js';
 
 // Load environment variables
 config();
@@ -39,10 +41,11 @@ client.once(Events.ClientReady, async (readyClient) => {
     }
 
     const commands = [
-      {
-        name: 'explore',
-        description: 'Start an exploration expedition in a biome',
-      },
+      new SlashCommandBuilder()
+        .setName('explore')
+        .setDescription('Start an exploration expedition in a biome')
+        .toJSON(),
+      getWalletCommandBuilder().toJSON(),
     ];
 
     if (guildId) {
@@ -74,6 +77,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (interaction.isChatInputCommand()) {
     if (interaction.commandName === 'explore') {
       await handleExploreCommand(interaction);
+    } else if (interaction.commandName === 'wallet') {
+      const subcommand = interaction.options.getSubcommand();
+      if (subcommand === 'set') {
+        const address = interaction.options.getString('address', true);
+        await handleWalletSet(interaction, address);
+      } else if (subcommand === 'view') {
+        await handleWalletView(interaction);
+      }
     }
   } else if (interaction.isButton()) {
     if (interaction.customId.startsWith('biome_')) {

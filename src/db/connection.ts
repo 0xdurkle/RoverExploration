@@ -104,6 +104,22 @@ async function createTables(): Promise<void> {
       ON explorations(user_id)
     `);
 
+    // User wallets table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_wallets (
+        id SERIAL PRIMARY KEY,
+        discord_id VARCHAR(20) UNIQUE NOT NULL,
+        wallet_address VARCHAR(42) NOT NULL,
+        updated_at TIMESTAMP DEFAULT NOW(),
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_user_wallets_discord_id 
+      ON user_wallets(discord_id)
+    `);
+
     // Migrate duration_hours from INTEGER to NUMERIC if needed (for 30s support)
     try {
       await pool.query(`
