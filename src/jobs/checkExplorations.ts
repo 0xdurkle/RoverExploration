@@ -62,6 +62,13 @@ async function processExploration(exploration: Exploration, channel: TextChannel
     console.log(`🔄 [PROCESS_EXPLORATION] Biome: ${exploration.biome}`);
     console.log(`🔄 [PROCESS_EXPLORATION] Duration: ${exploration.duration_hours} hours`);
     console.log(`🔄 [PROCESS_EXPLORATION] Ends at: ${exploration.ends_at}`);
+    console.log(`🔄 [PROCESS_EXPLORATION] Already completed: ${exploration.completed}`);
+    
+    // CRITICAL: Check if already completed - if so, skip processing
+    if (exploration.completed) {
+      console.log(`🔄 [PROCESS_EXPLORATION] ⚠️ Exploration ${exploration.id} is already completed, skipping`);
+      return;
+    }
     
     const biome = getBiome(exploration.biome);
     const biomeName = biome?.name || exploration.biome;
@@ -189,8 +196,30 @@ async function processExploration(exploration: Exploration, channel: TextChannel
     console.error(`🔄 [PROCESS_EXPLORATION] Error type:`, error instanceof Error ? error.constructor.name : typeof error);
     console.error(`🔄 [PROCESS_EXPLORATION] Error stack:`, error instanceof Error ? error.stack : String(error));
     
-    // Try to send error message to user
+    // Check if exploration was already completed (common case - don't spam errors)
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes('already completed') || errorMessage.includes('already has an item')) {
+      console.log(`🔄 [PROCESS_EXPLORATION] ⚠️ Exploration was already processed, skipping error message`);
+      return; // Don't send error message for already-completed explorations
+    }
+    
+    // Only send error message for actual errors (not already-completed cases)
+    // Limit to one error message per exploration to prevent spam
     try {
+      const { getDb } = await import('../db/connection');
+      const db = getDb();
+      const checkCompleted = await db.query(
+        `SELECT completed FROM explorations WHERE id = $1`,
+        [exploration.id]
+      );
+      
+      // If already completed, don't send error message
+      if (checkCompleted.rows[0]?.completed) {
+        console.log(`🔄 [PROCESS_EXPLORATION] Exploration ${exploration.id} is now completed, skipping error message`);
+        return;
+      }
+      
+      // Only send error if exploration is still not completed
       const user = await channel.client.users.fetch(exploration.user_id);
       const userMention = user ? `<@${exploration.user_id}>` : `User ${exploration.user_id}`;
       await channel.send(`❌ An error occurred processing ${userMention}'s exploration. Please try again.`);

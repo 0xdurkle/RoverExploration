@@ -209,15 +209,17 @@ export async function completeExploration(
         // Exploration was already completed, check what's in there
         console.log(`🔧 [COMPLETE_EXPLORATION] No rows updated, checking if already completed...`);
         const existing = await db.query(
-          `SELECT item_found, completed FROM explorations WHERE id = $1`,
+          `SELECT item_found, completed, distance_km FROM explorations WHERE id = $1`,
           [explorationId]
         );
         console.log(`🔧 [COMPLETE_EXPLORATION] Existing exploration data:`, existing.rows[0]);
         if (existing.rows[0]?.completed) {
           console.log(`   ⚠️ [COMPLETE_EXPLORATION] Exploration ${explorationId} was already completed, skipping`);
-          await db.query('COMMIT');
+          await db.query('ROLLBACK');
+          // Return silently - this is expected behavior, not an error
           return;
         }
+        await db.query('ROLLBACK');
         throw new Error(`Exploration ${explorationId} not found or already processing`);
       }
       
