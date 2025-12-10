@@ -290,16 +290,18 @@ async function updateUserProfile(
       console.log(`📋 [UPDATE_USER_PROFILE] Old exploration count: ${oldExplorationCount}, will increment to: ${newExplorationCount}`);
       
       // Use INSERT ... ON CONFLICT to ensure it always succeeds (handles both create and update)
+      // For INSERT (new profile): set to 1 (this is their first exploration)
+      // For UPDATE (existing profile): increment by 1
       const updateResult = await db.query(
         `INSERT INTO user_profiles (user_id, total_explorations, items_found, last_exploration_end)
-         VALUES ($1, $2, $3::jsonb, $4)
+         VALUES ($1, 1, $2::jsonb, $3)
          ON CONFLICT (user_id) 
          DO UPDATE SET 
            total_explorations = user_profiles.total_explorations + 1,
-           items_found = $3::jsonb,
-           last_exploration_end = $4
+           items_found = $2::jsonb,
+           last_exploration_end = $3
          RETURNING items_found, total_explorations`,
-        [userId, newExplorationCount, itemsJson, lastExplorationEnd]
+        [userId, itemsJson, lastExplorationEnd]
       );
       
       console.log(`📋 [UPDATE_USER_PROFILE] Upsert query executed, rows returned: ${updateResult.rows.length}`);
