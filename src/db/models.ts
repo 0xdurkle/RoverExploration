@@ -249,11 +249,22 @@ async function updateUserProfile(
         throw new Error(`Invalid rarity "${itemFound.rarity}" for item "${itemFound.name}"`);
       }
       
-      // Ensure itemFound has all required fields
+      // CRITICAL: Normalize biome - ensure it's stored as name, not ID
+      // This ensures consistency with getUserProfile normalization
+      let biomeName = itemFound.biome || 'Unknown';
+      if (biomeName.includes('_')) {
+        // Likely a biome ID, convert to name
+        const { getBiome } = await import('../services/rng');
+        const biomeData = getBiome(biomeName);
+        biomeName = biomeData?.name || biomeName;
+        console.log(`📋 [UPDATE_USER_PROFILE] Normalized biome from ID "${itemFound.biome}" to name "${biomeName}"`);
+      }
+      
+      // Ensure itemFound has all required fields with normalized biome
       const itemToSave: ItemFound = {
         name: itemFound.name,
         rarity: itemFound.rarity,
-        biome: itemFound.biome,
+        biome: biomeName, // Use normalized biome name
         found_at: itemFound.found_at instanceof Date ? itemFound.found_at : new Date(itemFound.found_at),
       };
       console.log(`📋 [UPDATE_USER_PROFILE] Item to save:`, JSON.stringify(itemToSave, null, 2));
