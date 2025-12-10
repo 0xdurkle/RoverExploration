@@ -277,9 +277,10 @@ async function updateUserProfile(
       const oldExplorationCount = existing.rows[0].total_explorations;
       console.log(`📋 [UPDATE_USER_PROFILE] Old exploration count: ${oldExplorationCount}, will increment to: ${oldExplorationCount + 1}`);
       
+      // Use a more explicit update to ensure it succeeds
       const updateResult = await db.query(
         `UPDATE user_profiles
-         SET total_explorations = total_explorations + 1,
+         SET total_explorations = COALESCE(total_explorations, 0) + 1,
              items_found = $1::jsonb,
              last_exploration_end = $2
          WHERE user_id = $3
@@ -289,64 +290,39 @@ async function updateUserProfile(
       
       console.log(`📋 [UPDATE_USER_PROFILE] Update query executed, rows returned: ${updateResult.rows.length}`);
       
-      if (updateResult.rows[0]) {
-        const savedItems = updateResult.rows[0].items_found;
-        const savedCount = Array.isArray(savedItems) ? savedItems.length : 0;
-        const newExplorationCount = updateResult.rows[0].total_explorations;
-        console.log(`📋 [UPDATE_USER_PROFILE] ✅ Updated profile for user ${userId}`);
-        console.log(`📋 [UPDATE_USER_PROFILE] Total explorations: ${oldExplorationCount} → ${newExplorationCount}`);
-        console.log(`📋 [UPDATE_USER_PROFILE] Items saved: ${savedCount}`);
-        console.log(`📋 [UPDATE_USER_PROFILE] Saved items_found type:`, typeof savedItems);
-        console.log(`📋 [UPDATE_USER_PROFILE] Saved items_found isArray:`, Array.isArray(savedItems));
-        
-        if (savedCount !== itemsFound.length) {
-          console.error(`📋 [UPDATE_USER_PROFILE] ⚠️ WARNING: Expected ${itemsFound.length} items but database has ${savedCount}!`);
-          console.error(`📋 [UPDATE_USER_PROFILE] Expected items:`, JSON.stringify(itemsFound, null, 2));
-          console.error(`📋 [UPDATE_USER_PROFILE] Saved items:`, JSON.stringify(savedItems, null, 2));
-        } else {
-          console.log(`📋 [UPDATE_USER_PROFILE] ✅ Item count matches: ${savedCount} items`);
-        }
-      } else {
+      if (updateResult.rows.length === 0) {
         console.error(`📋 [UPDATE_USER_PROFILE] ❌ Update query returned no rows for user ${userId}`);
-        throw new Error(`Failed to update user profile for user ${userId}`);
+        throw new Error(`Failed to update user profile for user ${userId} - user may not exist`);
       }
       
-      // CRITICAL: Verify item was actually saved to user profile
-      if (itemFound) {
-        console.log(`📋 [UPDATE_USER_PROFILE] Verifying item was saved...`);
-        const verifyResult = await db.query(
-          `SELECT items_found FROM user_profiles WHERE user_id = $1`,
-          [userId]
-        );
-        console.log(`📋 [UPDATE_USER_PROFILE] Verification query result:`, {
-          found: verifyResult.rows.length > 0,
-          rowCount: verifyResult.rows.length
-        });
-        
-        if (verifyResult.rows[0]) {
-          const savedItems = verifyResult.rows[0].items_found;
-          const itemsArray = Array.isArray(savedItems) ? savedItems : [];
-          console.log(`📋 [UPDATE_USER_PROFILE] Verification: itemsArray length = ${itemsArray.length}`);
-          console.log(`📋 [UPDATE_USER_PROFILE] Verification: Looking for item "${itemFound.name}" with rarity "${itemFound.rarity}"`);
-          
-          const itemExists = itemsArray.some((item: any) => {
-            const matches = item && item.name === itemFound.name && item.rarity === itemFound.rarity;
-            if (matches) {
-              console.log(`📋 [UPDATE_USER_PROFILE] Verification: Found matching item:`, JSON.stringify(item, null, 2));
-            }
-            return matches;
-          });
-          
-          if (!itemExists) {
-            console.error(`📋 [UPDATE_USER_PROFILE] ❌ CRITICAL: Item "${itemFound.name}" was NOT saved to user ${userId}'s inventory!`);
-            console.error(`📋 [UPDATE_USER_PROFILE] All items in inventory:`, JSON.stringify(itemsArray, null, 2));
-            throw new Error(`Item "${itemFound.name}" was not saved to user profile`);
-          }
-          console.log(`📋 [UPDATE_USER_PROFILE] ✅ Verified: Item "${itemFound.name}" is in user ${userId}'s inventory`);
-        } else {
-          console.error(`📋 [UPDATE_USER_PROFILE] ❌ Verification query returned no rows!`);
-        }
+      const savedItems = updateResult.rows[0].items_found;
+      const savedCount = Array.isArray(savedItems) ? savedItems.length : 0;
+      const newExplorationCount = updateResult.rows[0].total_explorations;
+      
+      console.log(`📋 [UPDATE_USER_PROFILE] ✅ Updated profile for user ${userId}`);
+      console.log(`📋 [UPDATE_USER_PROFILE] Total explorations: ${oldExplorationCount} → ${newExplorationCount}`);
+      console.log(`📋 [UPDATE_USER_PROFILE] Items saved: ${savedCount}`);
+      console.log(`📋 [UPDATE_USER_PROFILE] Saved items_found type:`, typeof savedItems);
+      console.log(`📋 [UPDATE_USER_PROFILE] Saved items_found isArray:`, Array.isArray(savedItems));
+      
+      // Verify the count was actually incremented
+      if (newExplorationCount !== oldExplorationCount + 1) {
+        console.error(`📋 [UPDATE_USER_PROFILE] ❌ CRITICAL: Exploration count was not incremented correctly!`);
+        console.error(`📋 [UPDATE_USER_PROFILE] Expected: ${oldExplorationCount + 1}, Got: ${newExplorationCount}`);
+        throw new Error(`Exploration count was not incremented correctly for user ${userId}`);
       }
+      
+      if (savedCount !== itemsFound.length) {
+        console.error(`📋 [UPDATE_USER_PROFILE] ⚠️ WARNING: Expected ${itemsFound.length} items but database has ${savedCount}!`);
+        console.error(`📋 [UPDATE_USER_PROFILE] Expected items:`, JSON.stringify(itemsFound, null, 2));
+        console.error(`📋 [UPDATE_USER_PROFILE] Saved items:`, JSON.stringify(savedItems, null, 2));
+        throw new Error(`Item count mismatch: expected ${itemsFound.length} but got ${savedCount}`);
+      } else {
+        console.log(`📋 [UPDATE_USER_PROFILE] ✅ Item count matches: ${savedCount} items`);
+      }
+      
+      // Note: Verification of items is now done in checkExplorations.ts after transaction commits
+      // This ensures we're reading the committed data
     } else {
       // Create new profile
       console.log(`📋 [UPDATE_USER_PROFILE] 📝 Creating NEW profile for user ${userId}`);

@@ -81,28 +81,58 @@ async function processExploration(exploration: Exploration, channel: TextChannel
       console.log(`🔄 [PROCESS_EXPLORATION] Item details:`, JSON.stringify(itemFound, null, 2));
     }
 
-    // CRITICAL: Verify item was saved to user profile BEFORE sending Discord message
+    // CRITICAL: Verify exploration was completed and stats were saved BEFORE sending Discord message
+    console.log(`🔄 [PROCESS_EXPLORATION] Verifying exploration completion and stats...`);
+    const { getDb } = await import('../db/connection');
+    const db = getDb();
+    
+    // First, verify exploration was marked as completed
+    console.log(`🔄 [PROCESS_EXPLORATION] Checking explorations table...`);
+    const verifyExploration = await db.query(
+      `SELECT item_found, completed FROM explorations WHERE id = $1`,
+      [exploration.id]
+    );
+    console.log(`🔄 [PROCESS_EXPLORATION] Exploration query result:`, {
+      found: verifyExploration.rows.length > 0,
+      completed: verifyExploration.rows[0]?.completed,
+      hasItem: !!verifyExploration.rows[0]?.item_found
+    });
+    
+    if (!verifyExploration.rows[0] || !verifyExploration.rows[0].completed) {
+      console.error(`🔄 [PROCESS_EXPLORATION] ❌ CRITICAL: Exploration ${exploration.id} was not marked as completed!`);
+      throw new Error(`Exploration ${exploration.id} was not properly completed`);
+    }
+    console.log(`🔄 [PROCESS_EXPLORATION] ✅ Verified: Exploration ${exploration.id} marked as completed`);
+    
+    // Verify user profile exists and exploration count was incremented
+    console.log(`🔄 [PROCESS_EXPLORATION] Checking user profile stats...`);
+    const verifyProfile = await db.query(
+      `SELECT items_found, total_explorations, last_exploration_end FROM user_profiles WHERE user_id = $1`,
+      [exploration.user_id]
+    );
+    console.log(`🔄 [PROCESS_EXPLORATION] Profile query result:`, {
+      found: verifyProfile.rows.length > 0,
+      totalExplorations: verifyProfile.rows[0]?.total_explorations,
+      itemsCount: Array.isArray(verifyProfile.rows[0]?.items_found) ? verifyProfile.rows[0].items_found.length : 'N/A',
+      lastExplorationEnd: verifyProfile.rows[0]?.last_exploration_end
+    });
+    
+    if (!verifyProfile.rows[0]) {
+      console.error(`🔄 [PROCESS_EXPLORATION] ❌ CRITICAL: User profile not found for user ${exploration.user_id}!`);
+      throw new Error(`User profile not found for user ${exploration.user_id}`);
+    }
+    
+    // Verify exploration count was incremented (should be at least 1)
+    const totalExplorations = verifyProfile.rows[0].total_explorations || 0;
+    if (totalExplorations < 1) {
+      console.error(`🔄 [PROCESS_EXPLORATION] ❌ CRITICAL: User ${exploration.user_id} has ${totalExplorations} total explorations, but should have at least 1!`);
+      throw new Error(`Exploration count was not incremented for user ${exploration.user_id}`);
+    }
+    console.log(`🔄 [PROCESS_EXPLORATION] ✅ Verified: User ${exploration.user_id} has ${totalExplorations} total exploration(s)`);
+    
+    // If item was found, verify it's in the inventory
     if (itemFound) {
-      console.log(`🔄 [PROCESS_EXPLORATION] Verifying item was saved...`);
-      const { getDb } = await import('../db/connection');
-      const db = getDb();
-      
-      // Verify item is in explorations table
-      console.log(`🔄 [PROCESS_EXPLORATION] Checking explorations table...`);
-      const verifyExploration = await db.query(
-        `SELECT item_found, completed FROM explorations WHERE id = $1`,
-        [exploration.id]
-      );
-      console.log(`🔄 [PROCESS_EXPLORATION] Exploration query result:`, {
-        found: verifyExploration.rows.length > 0,
-        completed: verifyExploration.rows[0]?.completed,
-        hasItem: !!verifyExploration.rows[0]?.item_found
-      });
-      
-      if (!verifyExploration.rows[0] || !verifyExploration.rows[0].completed) {
-        console.error(`🔄 [PROCESS_EXPLORATION] ❌ CRITICAL: Exploration ${exploration.id} was not marked as completed!`);
-        throw new Error(`Exploration ${exploration.id} was not properly completed`);
-      }
+      console.log(`🔄 [PROCESS_EXPLORATION] Verifying item was saved to inventory...`);
       
       const savedItem = verifyExploration.rows[0].item_found;
       if (!savedItem) {
@@ -112,23 +142,6 @@ async function processExploration(exploration: Exploration, channel: TextChannel
       
       const itemData = typeof savedItem === 'string' ? JSON.parse(savedItem) : savedItem;
       console.log(`🔄 [PROCESS_EXPLORATION] ✅ Verified: Item saved in explorations table: ${itemData.name}`);
-      
-      // CRITICAL: Verify item is in user profile inventory
-      console.log(`🔄 [PROCESS_EXPLORATION] Checking user profile inventory...`);
-      const verifyProfile = await db.query(
-        `SELECT items_found, total_explorations FROM user_profiles WHERE user_id = $1`,
-        [exploration.user_id]
-      );
-      console.log(`🔄 [PROCESS_EXPLORATION] Profile query result:`, {
-        found: verifyProfile.rows.length > 0,
-        totalExplorations: verifyProfile.rows[0]?.total_explorations,
-        itemsCount: Array.isArray(verifyProfile.rows[0]?.items_found) ? verifyProfile.rows[0].items_found.length : 'N/A'
-      });
-      
-      if (!verifyProfile.rows[0]) {
-        console.error(`🔄 [PROCESS_EXPLORATION] ❌ CRITICAL: User profile not found for user ${exploration.user_id}!`);
-        throw new Error(`User profile not found for user ${exploration.user_id}`);
-      }
       
       const savedItems = verifyProfile.rows[0].items_found;
       const itemsArray = Array.isArray(savedItems) ? savedItems : [];
@@ -152,7 +165,7 @@ async function processExploration(exploration: Exploration, channel: TextChannel
       
       console.log(`🔄 [PROCESS_EXPLORATION] ✅ Verified: Item "${itemFound.name}" is in user ${exploration.user_id}'s inventory`);
     } else {
-      console.log(`🔄 [PROCESS_EXPLORATION] No item found, skipping verification`);
+      console.log(`🔄 [PROCESS_EXPLORATION] No item found, but exploration count was verified`);
     }
 
     // Get user mention
