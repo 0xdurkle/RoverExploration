@@ -113,11 +113,19 @@ if (!interactionHandlerRegistered) {
   // Check and mark as processed atomically
   if (processedInteractions.has(interaction.id)) {
     console.log(`⚠️ [INTERACTION] Interaction ${interaction.id} already processed, ignoring duplicate event`);
+    if (interaction.isButton() && interaction.customId.startsWith('duration_')) {
+      console.log(`⚠️ [INTERACTION] DUPLICATE DURATION INTERACTION: ${interaction.id}, CustomID: ${interaction.customId}, User: ${interaction.user.id}`);
+    }
     return;
   }
   
   // Mark as processed immediately to prevent race conditions
   processedInteractions.add(interaction.id);
+  
+  // Log duration button interactions for debugging
+  if (interaction.isButton() && interaction.customId.startsWith('duration_')) {
+    console.log(`🔘 [INTERACTION] NEW DURATION INTERACTION: ${interaction.id}, CustomID: ${interaction.customId}, User: ${interaction.user.id}, Processed Set Size: ${processedInteractions.size}`);
+  }
   
   // Add error handling wrapper
   try {
