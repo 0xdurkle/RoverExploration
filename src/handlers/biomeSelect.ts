@@ -64,7 +64,7 @@ export async function handleBiomeSelect(interaction: ButtonInteraction): Promise
     console.error(`🔘 [BIOME_SELECT] ❌ Error handling biome selection:`, error);
     // Try to send error message if interaction is still valid
     try {
-      if (!interaction.replied) {
+      if (interaction.isRepliable() && !interaction.replied) {
         await safeFollowUp(interaction, {
           content: '❌ An error occurred. Please try again.',
           ephemeral: true,

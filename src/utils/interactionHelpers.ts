@@ -1,4 +1,9 @@
-import { ButtonInteraction, ChatInputCommandInteraction, Interaction } from 'discord.js';
+import { 
+  ButtonInteraction, 
+  ChatInputCommandInteraction, 
+  Interaction,
+  RepliableInteraction 
+} from 'discord.js';
 
 /**
  * Safely defer an interaction update
@@ -29,14 +34,14 @@ export async function safeDeferUpdate(interaction: ButtonInteraction): Promise<b
  */
 export async function safeEditReply(
   interaction: ButtonInteraction | ChatInputCommandInteraction,
-  options: Parameters<typeof interaction.editReply>[0]
+  options: Parameters<ButtonInteraction['editReply']>[0]
 ): Promise<boolean> {
   try {
     if (!interaction.deferred && !interaction.replied) {
       console.log(`⚠️ [INTERACTION] Interaction ${interaction.id} not deferred, deferring first...`);
       if (interaction.isButton()) {
         await interaction.deferUpdate();
-      } else {
+      } else if (interaction.isChatInputCommand()) {
         await interaction.deferReply({ ephemeral: true });
       }
     }
@@ -49,10 +54,14 @@ export async function safeEditReply(
       return false;
     }
     console.error(`❌ [INTERACTION] Error editing reply for interaction ${interaction.id}:`, error);
-    // Try followUp as fallback
+    // Try followUp as fallback (only for repliable interactions)
     try {
-      if (interaction.isButton() || (interaction.isChatInputCommand() && interaction.ephemeral)) {
-        await interaction.followUp({ ...options, ephemeral: true });
+      if (interaction.isRepliable()) {
+        const followUpOptions: Parameters<RepliableInteraction['followUp']>[0] = {
+          ...(typeof options === 'object' ? options : {}),
+          ephemeral: true,
+        };
+        await interaction.followUp(followUpOptions);
         return true;
       }
     } catch (followUpError) {
@@ -66,8 +75,8 @@ export async function safeEditReply(
  * Safely send a follow-up message
  */
 export async function safeFollowUp(
-  interaction: Interaction,
-  options: Parameters<typeof interaction.followUp>[0]
+  interaction: RepliableInteraction,
+  options: Parameters<RepliableInteraction['followUp']>[0]
 ): Promise<boolean> {
   try {
     await interaction.followUp(options);
@@ -89,9 +98,11 @@ export function isInteractionValid(interaction: Interaction): boolean {
   // Discord interactions expire after 3 seconds if not acknowledged
   // or 15 minutes if acknowledged
   // We can't check this directly, but we can check if it's already been handled
-  if (interaction.replied && !interaction.deferred) {
-    // If replied but not deferred, it might be expired
-    return false;
+  if (interaction.isRepliable()) {
+    if (interaction.replied && !interaction.deferred) {
+      // If replied but not deferred, it might be expired
+      return false;
+    }
   }
   return true;
 }
