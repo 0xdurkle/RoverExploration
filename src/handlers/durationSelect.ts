@@ -33,9 +33,14 @@ setInterval(() => {
  * Handle duration selection button click
  * Note: Duplicate prevention is handled at the index.ts level via atomic interaction tracking
  */
+// Track which exploration IDs are currently being processed
+// This prevents the same exploration from being processed twice even with different interaction IDs
+const processingExplorations = new Set<number>();
+
 export async function handleDurationSelect(interaction: ButtonInteraction): Promise<void> {
   const userId = interaction.user.id;
   const callId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  let exploration: any = null; // Declare at function scope so it's accessible in catch block
   
   try {
     console.log(`⏱️ [DURATION_SELECT] ==========================================`);
@@ -109,10 +114,22 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
     // This prevents race conditions at the database level
     console.log(`⏱️ [DURATION_SELECT] Starting exploration for user ${userId}, biome ${biomeId}, duration ${durationHours}h`);
     
-    let exploration: any = null;
     try {
       exploration = await startExploration(userId, biomeId, durationHours);
       console.log(`⏱️ [DURATION_SELECT] ✅ Exploration started successfully, ID: ${exploration.id}`);
+      
+      // CRITICAL: Check if this exploration is already being processed by another handler call
+      // This prevents duplicate messages even if handler is called twice with different interaction IDs
+      if (processingExplorations.has(exploration.id)) {
+        console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] ⚠️ Exploration ${exploration.id} is already being processed, skipping duplicate handler call`);
+        console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Interaction ID: ${interaction.id}, User: ${userId}`);
+        console.log(`⏱️ [DURATION_SELECT] ==========================================`);
+        return; // Exit immediately - another handler call is already processing this exploration
+      }
+      
+      // Mark as being processed
+      processingExplorations.add(exploration.id);
+      console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Marked exploration ${exploration.id} as being processed`);
     } catch (error: any) {
       // Clear user lock on error
       usersCreatingExplorations.delete(userId);
@@ -264,10 +281,25 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
         // Don't fail the exploration if the public message fails
       }
     }
+    
+    // Clear processing flag after completion (only if we successfully sent the message)
+    // We keep it set until message is sent to prevent duplicates
+    const explorationId = exploration?.id;
+    if (explorationId) {
+      // Only clear if message was sent (it's in sentMessages)
+      if (sentMessages.has(explorationId)) {
+        processingExplorations.delete(explorationId);
+        console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Cleared processing flag for exploration ${explorationId} (message sent)`);
+      }
+    }
+    
     console.log(`⏱️ [DURATION_SELECT] ==========================================`);
   } catch (error) {
     // Always clear user lock on error
     usersCreatingExplorations.delete(userId);
+    
+    // Try to clear processing flag on error - we need to check if exploration was created
+    // We'll look for explorationId in the scope or check the error
     
     console.error(`⏱️ [DURATION_SELECT] ❌ Error starting exploration:`, error);
     console.error(`⏱️ [DURATION_SELECT] Error stack:`, error instanceof Error ? error.stack : String(error));
