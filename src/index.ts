@@ -2,15 +2,13 @@ import { Client, GatewayIntentBits, Collection, Events } from 'discord.js';
 import { config } from 'dotenv';
 import * as cron from 'node-cron';
 import { initDatabase, closeDatabase } from './db/connection';
-import { handleExploreCommand } from './commands/explore';
+import { handleExploreCommand, getExploreCommandBuilder } from './commands/explore';
 import { handleWalletSet, handleWalletView, getWalletCommandBuilder } from './commands/wallet';
 import { handleInventoryCommand, getInventoryCommandBuilder } from './commands/inventory';
 import { handlePartyCreate, getPartyCommandBuilder } from './commands/party';
 import { handleDebugCommand, getDebugCommandBuilder } from './commands/debug';
 import { handleRepairCommand, getRepairCommandBuilder } from './commands/repair';
 import { handleEndAllCommand, getEndAllCommandBuilder } from './commands/endAll';
-import { handleBiomeSelect } from './handlers/biomeSelect';
-import { handleDurationSelect } from './handlers/durationSelect';
 import { handlePartyJoin } from './handlers/partyJoin';
 import { checkAndProcessExplorations } from './jobs/checkExplorations';
 import { SlashCommandBuilder } from 'discord.js';
@@ -47,10 +45,7 @@ client.once(Events.ClientReady, async (readyClient) => {
     }
 
     const commands = [
-      new SlashCommandBuilder()
-        .setName('explore')
-        .setDescription('Start an exploration expedition in a biome')
-        .toJSON(),
+      getExploreCommandBuilder().toJSON(),
       getWalletCommandBuilder().toJSON(),
       getInventoryCommandBuilder().toJSON(),
       getPartyCommandBuilder().toJSON(),
@@ -113,19 +108,12 @@ if (!interactionHandlerRegistered) {
   // Check and mark as processed atomically
   if (processedInteractions.has(interaction.id)) {
     console.log(`⚠️ [INTERACTION] Interaction ${interaction.id} already processed, ignoring duplicate event`);
-    if (interaction.isButton() && interaction.customId.startsWith('duration_')) {
-      console.log(`⚠️ [INTERACTION] DUPLICATE DURATION INTERACTION: ${interaction.id}, CustomID: ${interaction.customId}, User: ${interaction.user.id}`);
-    }
     return;
   }
   
   // Mark as processed immediately to prevent race conditions
   processedInteractions.add(interaction.id);
   
-  // Log duration button interactions for debugging
-  if (interaction.isButton() && interaction.customId.startsWith('duration_')) {
-    console.log(`🔘 [INTERACTION] NEW DURATION INTERACTION: ${interaction.id}, CustomID: ${interaction.customId}, User: ${interaction.user.id}, Processed Set Size: ${processedInteractions.size}`);
-  }
   
   // Add error handling wrapper
   try {
@@ -162,11 +150,7 @@ if (!interactionHandlerRegistered) {
         await handleEndAllCommand(interaction);
       }
     } else if (interaction.isButton()) {
-      if (interaction.customId.startsWith('biome_')) {
-        await handleBiomeSelect(interaction);
-      } else if (interaction.customId.startsWith('duration_')) {
-        await handleDurationSelect(interaction);
-      } else if (interaction.customId.startsWith('party_join_')) {
+      if (interaction.customId.startsWith('party_join_')) {
         await handlePartyJoin(interaction);
       }
     }
