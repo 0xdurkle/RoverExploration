@@ -9,6 +9,7 @@ import { handlePartyCreate, getPartyCommandBuilder } from './commands/party';
 import { handleDebugCommand, getDebugCommandBuilder } from './commands/debug';
 import { handleRepairCommand, getRepairCommandBuilder } from './commands/repair';
 import { handleEndAllCommand, getEndAllCommandBuilder } from './commands/endAll';
+import { handleHowCommand, getHowCommandBuilder } from './commands/how';
 import { handlePartyJoin } from './handlers/partyJoin';
 import { checkAndProcessExplorations } from './jobs/checkExplorations';
 
@@ -51,6 +52,7 @@ client.once(Events.ClientReady, async (readyClient) => {
       getDebugCommandBuilder().toJSON(),
       getRepairCommandBuilder().toJSON(),
       getEndAllCommandBuilder().toJSON(),
+      getHowCommandBuilder().toJSON(),
     ];
 
     if (guildId) {
@@ -147,6 +149,8 @@ if (!interactionHandlerRegistered) {
         await handleRepairCommand(interaction);
       } else if (interaction.commandName === 'endall') {
         await handleEndAllCommand(interaction);
+      } else if (interaction.commandName === 'how') {
+        await handleHowCommand(interaction);
       }
     } else if (interaction.isButton()) {
       if (interaction.customId.startsWith('party_join_')) {
