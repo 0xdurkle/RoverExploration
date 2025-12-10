@@ -47,10 +47,11 @@ export async function handleDebugCommand(interaction: ChatInputCommandInteractio
     let itemsFound: any[] = [];
     if (Array.isArray(profile.items_found)) {
       itemsFound = profile.items_found;
-    } else if (typeof profile.items_found === 'string') {
+    } else if (profile.items_found && typeof profile.items_found === 'string') {
       try {
         itemsFound = JSON.parse(profile.items_found);
       } catch (e) {
+        debugInfo += `- JSON Parse Error: ${e instanceof Error ? e.message : String(e)}\n`;
         itemsFound = [];
       }
     } else if (profile.items_found) {
@@ -67,9 +68,21 @@ export async function handleDebugCommand(interaction: ChatInputCommandInteractio
     
     debugInfo += `\n**Recent Explorations (last 10):**\n`;
     explorationsResult.rows.forEach((exp, i) => {
-      const itemInfo = exp.item_found 
-        ? `${JSON.parse(exp.item_found)?.name || 'Unknown'} (${JSON.parse(exp.item_found)?.rarity || 'Unknown'})`
-        : 'None';
+      let itemInfo = 'None';
+      if (exp.item_found) {
+        try {
+          // item_found might already be an object (JSONB) or a string
+          let itemData: any;
+          if (typeof exp.item_found === 'string') {
+            itemData = JSON.parse(exp.item_found);
+          } else {
+            itemData = exp.item_found;
+          }
+          itemInfo = `${itemData?.name || 'Unknown'} (${itemData?.rarity || 'Unknown'})`;
+        } catch (e) {
+          itemInfo = `Parse Error: ${e instanceof Error ? e.message : String(e)}`;
+        }
+      }
       debugInfo += `${i + 1}. ${exp.biome} - Completed: ${exp.completed} - Item: ${itemInfo}\n`;
     });
 
