@@ -7,6 +7,7 @@ import { handleWalletSet, handleWalletView, getWalletCommandBuilder } from './co
 import { handleInventoryCommand, getInventoryCommandBuilder } from './commands/inventory';
 import { handlePartyCreate, getPartyCommandBuilder } from './commands/party';
 import { handleDebugCommand, getDebugCommandBuilder } from './commands/debug';
+import { handleRepairCommand, getRepairCommandBuilder } from './commands/repair';
 import { handleBiomeSelect } from './handlers/biomeSelect';
 import { handleDurationSelect } from './handlers/durationSelect';
 import { handlePartyJoin } from './handlers/partyJoin';
@@ -53,6 +54,7 @@ client.once(Events.ClientReady, async (readyClient) => {
       getInventoryCommandBuilder().toJSON(),
       getPartyCommandBuilder().toJSON(),
       getDebugCommandBuilder().toJSON(),
+      getRepairCommandBuilder().toJSON(),
     ];
 
     if (guildId) {
@@ -101,6 +103,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
     } else if (interaction.commandName === 'debug') {
       await handleDebugCommand(interaction);
+    } else if (interaction.commandName === 'repair') {
+      await handleRepairCommand(interaction);
     }
   } else if (interaction.isButton()) {
     if (interaction.customId.startsWith('biome_')) {
