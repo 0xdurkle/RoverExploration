@@ -87,8 +87,17 @@ export function buildItemCounts(itemsFound: ItemFound[]): ItemCount[] {
     return [];
   }
   
+  console.log(`🔍 buildItemCounts: Input has ${itemsFound.length} items`);
+  itemsFound.forEach((item, idx) => {
+    console.log(`   Input item ${idx}:`, JSON.stringify(item));
+  });
+  
   // Count items directly from user's found items
   const userCounts = countUserItems(itemsFound);
+  console.log(`🔍 buildItemCounts: userCounts has ${userCounts.size} unique items`);
+  userCounts.forEach((count, name) => {
+    console.log(`   Counted: ${name} = ${count}x`);
+  });
   
   // Create a map of item name -> stored rarity and biome from user's found items
   // Use the stored rarity, not the biome data rarity
@@ -103,6 +112,7 @@ export function buildItemCounts(itemsFound: ItemFound[]): ItemCount[] {
     // Store the rarity that was actually discovered (most recent if multiple)
     storedRarities.set(item.name, item.rarity);
     storedBiomes.set(item.name, item.biome);
+    console.log(`   Stored mapping: ${item.name} -> rarity: ${item.rarity}, biome: ${item.biome}`);
   });
   
   const itemCounts: ItemCount[] = [];
@@ -110,14 +120,22 @@ export function buildItemCounts(itemsFound: ItemFound[]): ItemCount[] {
 
   // FIRST: Show all items the user has actually found (simplified approach)
   // This ensures user's items always show up
+  console.log(`🔍 buildItemCounts: Processing ${userCounts.size} unique items from userCounts`);
   userCounts.forEach((count, itemName) => {
+    console.log(`   Checking item: "${itemName}" with count: ${count}`);
     if (count > 0) {
       const rarity = storedRarities.get(itemName);
       const biome = storedBiomes.get(itemName);
       
+      console.log(`     Stored rarity: ${rarity}, stored biome: ${biome}`);
+      
       // Try to find the item in biome data to get display name if biome is an ID
       const allItems = getAllItems();
       const biomeItem = allItems.find(item => item.name === itemName);
+      console.log(`     Found in biome data: ${biomeItem ? 'YES' : 'NO'}`);
+      if (biomeItem) {
+        console.log(`     Biome data item:`, JSON.stringify(biomeItem));
+      }
       
       // Use stored rarity if available, otherwise try biome data, default to 'uncommon'
       const finalRarity = rarity || biomeItem?.rarity || 'uncommon';
@@ -128,23 +146,31 @@ export function buildItemCounts(itemsFound: ItemFound[]): ItemCount[] {
       const validRarities = ['uncommon', 'rare', 'legendary'];
       const safeRarity = validRarities.includes(finalRarity) ? finalRarity : 'uncommon';
       
-      console.log(`   Processing user item: ${itemName} - count: ${count}, rarity: ${safeRarity}, biome: ${finalBiome}`);
+      console.log(`     Final values - rarity: ${safeRarity}, biome: ${finalBiome}`);
       
-      itemCounts.push({
+      const itemToAdd = {
         name: itemName,
         count,
         rarity: safeRarity,
         biome: finalBiome,
         emoji: getRarityEmoji(safeRarity as 'uncommon' | 'rare' | 'legendary'),
-      });
+      };
+      
+      console.log(`     ✅ Adding item:`, JSON.stringify(itemToAdd));
+      itemCounts.push(itemToAdd);
       processedItemNames.add(itemName);
+    } else {
+      console.log(`     ⚠️ Skipping item with count 0`);
     }
   });
+  
+  console.log(`🔍 buildItemCounts: After processing user items, have ${itemCounts.length} items in itemCounts`);
 
   // THEN: Add biome items that user hasn't found yet (for 0 counts)
   // This allows showing all available items
   // (Note: getAllItems was already called above, but we call it again here for clarity)
   const allItemsForDisplay = getAllItems();
+  console.log(`🔍 buildItemCounts: Adding ${allItemsForDisplay.length} items from biome data for 0 counts`);
   allItemsForDisplay.forEach((item) => {
     if (!processedItemNames.has(item.name)) {
       itemCounts.push({
@@ -155,6 +181,13 @@ export function buildItemCounts(itemsFound: ItemFound[]): ItemCount[] {
         emoji: getRarityEmoji(item.rarity as 'uncommon' | 'rare' | 'legendary'),
       });
       processedItemNames.add(item.name);
+    }
+  });
+
+  console.log(`🔍 buildItemCounts: Final result - ${itemCounts.length} total items`);
+  itemCounts.forEach((item, idx) => {
+    if (item.count > 0) {
+      console.log(`   Final item ${idx}: ${item.name} x${item.count} (${item.rarity})`);
     }
   });
 

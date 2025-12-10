@@ -71,7 +71,13 @@ export async function handleInventoryCommand(interaction: ChatInputCommandIntera
     // Filter out items with 0 count for display
     const itemsToDisplay = itemCounts.filter(item => item.count > 0);
     
+    console.log(`📦 Inventory: Filtered to ${itemsToDisplay.length} items with count > 0`);
+    itemsToDisplay.forEach((item, idx) => {
+      console.log(`   Display item ${idx}: ${item.name} x${item.count} (${item.rarity})`);
+    });
+    
     if (itemsToDisplay.length === 0) {
+      console.log(`   ⚠️ No items to display - showing empty message`);
       embed.setDescription('You have no items yet. Go explore to find some!');
     } else {
       // Build item list
@@ -79,7 +85,8 @@ export async function handleInventoryCommand(interaction: ChatInputCommandIntera
       embed.setDescription(itemLines.join('\n'));
       
       // Debug logging
-      console.log(`   Displaying ${itemsToDisplay.length} items with count > 0`);
+      console.log(`   ✅ Displaying ${itemsToDisplay.length} items with count > 0`);
+      console.log(`   Item lines:`, itemLines);
     }
 
     // Add stats
