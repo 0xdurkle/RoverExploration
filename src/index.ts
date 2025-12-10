@@ -11,6 +11,7 @@ import { handleRepairCommand, getRepairCommandBuilder } from './commands/repair'
 import { handleEndAllCommand, getEndAllCommandBuilder } from './commands/endAll';
 import { handleHowCommand, getHowCommandBuilder } from './commands/how';
 import { handlePartyJoin } from './handlers/partyJoin';
+import { handleHowNavigation } from './handlers/howNavigation';
 import { checkAndProcessExplorations } from './jobs/checkExplorations';
 
 // Load environment variables
@@ -155,6 +156,8 @@ if (!interactionHandlerRegistered) {
     } else if (interaction.isButton()) {
       if (interaction.customId.startsWith('party_join_')) {
         await handlePartyJoin(interaction);
+      } else if (interaction.customId.startsWith('how_nav_')) {
+        await handleHowNavigation(interaction);
       }
     }
   } catch (error) {
