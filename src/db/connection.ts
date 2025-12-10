@@ -113,7 +113,7 @@ async function createTables(): Promise<void> {
       CREATE TABLE IF NOT EXISTS user_wallets (
         id SERIAL PRIMARY KEY,
         discord_id VARCHAR(20) UNIQUE NOT NULL,
-        wallet_address VARCHAR(42) NOT NULL,
+        wallet_address VARCHAR(42) UNIQUE NOT NULL,
         updated_at TIMESTAMP DEFAULT NOW(),
         created_at TIMESTAMP DEFAULT NOW()
       )
@@ -123,6 +123,20 @@ async function createTables(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_user_wallets_discord_id 
       ON user_wallets(discord_id)
     `);
+
+    // Add unique constraint on wallet_address if it doesn't exist (migration)
+    try {
+      await pool.query(`
+        ALTER TABLE user_wallets 
+        ADD CONSTRAINT user_wallets_wallet_address_unique UNIQUE (wallet_address)
+      `);
+      console.log('✅ Added unique constraint on wallet_address');
+    } catch (error: any) {
+      // Constraint might already exist or column might not exist yet - that's fine
+      if (!error.message.includes('already exists') && !error.message.includes('does not exist')) {
+        console.log('ℹ️  Wallet address uniqueness check:', error.message);
+      }
+    }
 
     // Migrate duration_hours from INTEGER to NUMERIC if needed (for 30s support)
     try {

@@ -1,6 +1,6 @@
 import { ChatInputCommandInteraction, SlashCommandBuilder, SlashCommandSubcommandsOnlyBuilder } from 'discord.js';
 import { ethers } from 'ethers';
-import { saveUserWallet, getUserWallet } from '../db/models';
+import { saveUserWallet, getUserWallet, getUserWalletByAddress } from '../db/models';
 
 /**
  * Handle /wallet set command
@@ -23,6 +23,15 @@ export async function handleWalletSet(
     // Get checksum address (properly formatted)
     const checksumAddress = ethers.getAddress(address);
 
+    // Check if this wallet is already linked to a different Discord account
+    const existingWallet = await getUserWalletByAddress(checksumAddress);
+    if (existingWallet && existingWallet.discord_id !== interaction.user.id) {
+      await interaction.editReply({
+        content: '❌ This wallet address is already linked to another Discord account. Each wallet can only be linked to one account.',
+      });
+      return;
+    }
+
     // Save to database
     await saveUserWallet(interaction.user.id, checksumAddress);
 
@@ -30,8 +39,17 @@ export async function handleWalletSet(
     await interaction.editReply({
       content: `🔗 Your airdrop address has been updated to \`${checksumAddress}\`\n\nThis will be used for future reward drops.`,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error saving wallet:', error);
+    
+    // Check for unique constraint violation (wallet already linked to another account)
+    if (error.code === '23505' && error.constraint === 'user_wallets_wallet_address_unique') {
+      await interaction.editReply({
+        content: '❌ This wallet address is already linked to another Discord account. Each wallet can only be linked to one account.',
+      });
+      return;
+    }
+    
     await interaction.editReply({
       content: '❌ An error occurred while saving your wallet address. Please try again.',
     });

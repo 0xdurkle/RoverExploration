@@ -217,3 +217,17 @@ export async function getUserWallet(discordId: string): Promise<UserWallet | nul
 
   return result.rows[0] || null;
 }
+
+/**
+ * Get wallet by address (to check if already linked)
+ */
+export async function getUserWalletByAddress(walletAddress: string): Promise<UserWallet | null> {
+  const db = getDb();
+
+  const result = await db.query(
+    `SELECT * FROM user_wallets WHERE wallet_address = $1`,
+    [walletAddress]
+  );
+
+  return result.rows[0] || null;
+}
