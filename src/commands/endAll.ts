@@ -1,6 +1,6 @@
 import { ChatInputCommandInteraction, SlashCommandBuilder } from 'discord.js';
-import { endAllExplorations, getDb } from '../db/models';
-import { initDatabase, getDb as getDbConnection } from '../db/connection';
+import { endAllExplorations } from '../db/models';
+import { initDatabase, getDb } from '../db/connection';
 
 /**
  * Admin command to end all active explorations
@@ -14,7 +14,7 @@ export async function handleEndAllCommand(interaction: ChatInputCommandInteracti
     await initDatabase();
 
     // First, check what's actually in the database for debugging
-    const db = getDbConnection();
+    const db = getDb();
     const now = new Date();
     const checkQuery = await db.query(
       `SELECT id, user_id, biome, ends_at, completed, created_at 
