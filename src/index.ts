@@ -83,10 +83,33 @@ client.once(Events.ClientReady, async (readyClient) => {
   console.log('✅ Exploration checker started (checking every 10 seconds)');
 });
 
+// Track processed interactions to prevent duplicate processing
+const processedInteractions = new Set<string>();
+const PROCESSED_CLEANUP_INTERVAL = 60000; // Clean up after 1 minute
+
+// Clean up old interaction IDs periodically
+setInterval(() => {
+  const before = processedInteractions.size;
+  // Keep only recent interactions (this is just for memory management)
+  // The Set will naturally prevent duplicates during the cleanup window
+  if (processedInteractions.size > 1000) {
+    processedInteractions.clear();
+    console.log(`🧹 [INTERACTION] Cleared processed interactions cache (had ${before} entries)`);
+  }
+}, PROCESSED_CLEANUP_INTERVAL);
+
 // Handle slash commands and button interactions
 client.on(Events.InteractionCreate, async (interaction) => {
   // Add error handling wrapper
   try {
+    // CRITICAL: Prevent duplicate processing of the same interaction
+    // Discord may send the same interaction event multiple times
+    if (processedInteractions.has(interaction.id)) {
+      console.log(`⚠️ [INTERACTION] Interaction ${interaction.id} already processed, ignoring duplicate event`);
+      return;
+    }
+    processedInteractions.add(interaction.id);
+    
     // Log all interactions for debugging
     if (interaction.isButton()) {
       console.log(`🔘 [INTERACTION] Button interaction: ${interaction.customId}, User: ${interaction.user.id}, Deferred: ${interaction.deferred}, Replied: ${interaction.replied}`);
