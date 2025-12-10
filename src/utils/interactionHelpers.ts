@@ -58,10 +58,21 @@ export async function safeEditReply(
     try {
       if (interaction.isRepliable()) {
         // Extract only the properties we need for followUp
+        // Filter out null values since InteractionReplyOptions doesn't accept null
+        const content = typeof options === 'object' && options && 'content' in options 
+          ? (options.content === null ? undefined : options.content)
+          : undefined;
+        const embeds = typeof options === 'object' && options && 'embeds' in options 
+          ? options.embeds 
+          : undefined;
+        const components = typeof options === 'object' && options && 'components' in options 
+          ? options.components 
+          : undefined;
+        
         const followUpOptions: Parameters<RepliableInteraction['followUp']>[0] = {
-          content: typeof options === 'object' && options && 'content' in options ? options.content : undefined,
-          embeds: typeof options === 'object' && options && 'embeds' in options ? options.embeds : undefined,
-          components: typeof options === 'object' && options && 'components' in options ? options.components : undefined,
+          ...(content !== undefined ? { content } : {}),
+          ...(embeds !== undefined ? { embeds } : {}),
+          ...(components !== undefined ? { components } : {}),
           ephemeral: true,
         };
         await interaction.followUp(followUpOptions);
