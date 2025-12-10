@@ -73,11 +73,40 @@ async function processExploration(exploration: Exploration, channel: TextChannel
         itemFound.rarity
       );
       await channel.send(message);
+      console.log(`   ✅ Sent Discord message for item: ${itemFound.name} (${itemFound.rarity})`);
+      
+      // Verify item was actually saved by checking the exploration record
+      const { getDb } = await import('../db/connection');
+      const db = getDb();
+      const verifyExploration = await db.query(
+        `SELECT item_found FROM explorations WHERE id = $1`,
+        [exploration.id]
+      );
+      if (verifyExploration.rows[0]) {
+        const savedItem = verifyExploration.rows[0].item_found;
+        if (savedItem) {
+          const itemData = typeof savedItem === 'string' ? JSON.parse(savedItem) : savedItem;
+          console.log(`   ✅ Verified: Item saved in explorations table: ${itemData.name}`);
+        } else {
+          console.error(`   ❌ WARNING: Item was discovered but NOT saved in explorations table!`);
+        }
+      }
     } else {
       const message = getReturnEmptyMessage(userMention, `**${biomeName}**`);
       await channel.send(message);
+      console.log(`   ✅ Sent Discord message: no item found`);
     }
   } catch (error) {
-    console.error(`❌ Error processing exploration ${exploration.id}:`, error);
+    console.error(`   ❌ Error processing exploration ${exploration.id}:`, error);
+    console.error(`   Error stack:`, error instanceof Error ? error.stack : String(error));
+    
+    // Try to send error message to user
+    try {
+      const user = await channel.client.users.fetch(exploration.user_id);
+      const userMention = user ? `<@${exploration.user_id}>` : `User ${exploration.user_id}`;
+      await channel.send(`❌ An error occurred processing ${userMention}'s exploration. Please try again.`);
+    } catch (sendError) {
+      console.error(`   ❌ Failed to send error message:`, sendError);
+    }
   }
 }
