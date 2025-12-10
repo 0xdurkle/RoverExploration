@@ -84,39 +84,43 @@ client.once(Events.ClientReady, async (readyClient) => {
 });
 
 // Track processed interactions to prevent duplicate processing
-// Use Map with promises to make deduplication atomic and prevent race conditions
-const processingInteractions = new Map<string, Promise<void>>();
+// Use Set for simple, reliable deduplication
+const processedInteractions = new Set<string>();
 const PROCESSED_CLEANUP_INTERVAL = 60000; // Clean up after 1 minute
+
+// Track if interaction handler is already registered to prevent duplicate registrations
+let interactionHandlerRegistered = false;
 
 // Clean up old interaction IDs periodically
 setInterval(() => {
-  const before = processingInteractions.size;
+  const before = processedInteractions.size;
   // Keep only recent interactions (this is just for memory management)
-  if (processingInteractions.size > 1000) {
-    processingInteractions.clear();
+  if (processedInteractions.size > 1000) {
+    processedInteractions.clear();
     console.log(`🧹 [INTERACTION] Cleared processed interactions cache (had ${before} entries)`);
   }
 }, PROCESSED_CLEANUP_INTERVAL);
 
 // Handle slash commands and button interactions
-client.on(Events.InteractionCreate, async (interaction) => {
+// Only register once to prevent duplicate event handlers
+if (!interactionHandlerRegistered) {
+  interactionHandlerRegistered = true;
+  console.log('✅ [INTERACTION] Registering interaction handler (single registration)');
+  
+  client.on(Events.InteractionCreate, async (interaction) => {
+  // CRITICAL: Prevent duplicate processing of the same interaction
+  // Discord may send the same interaction event multiple times
+  // Check and mark as processed atomically
+  if (processedInteractions.has(interaction.id)) {
+    console.log(`⚠️ [INTERACTION] Interaction ${interaction.id} already processed, ignoring duplicate event`);
+    return;
+  }
+  
+  // Mark as processed immediately to prevent race conditions
+  processedInteractions.add(interaction.id);
+  
   // Add error handling wrapper
   try {
-    // CRITICAL: Prevent duplicate processing of the same interaction atomically
-    // Discord may send the same interaction event multiple times
-    // Use Map to make check-and-set atomic - if key exists, interaction is already processing
-    if (processingInteractions.has(interaction.id)) {
-      console.log(`⚠️ [INTERACTION] Interaction ${interaction.id} already processing, ignoring duplicate event`);
-      return;
-    }
-    
-    // Create a promise for this interaction and store it immediately (atomic operation)
-    let resolveProcessing: () => void;
-    const processingPromise = new Promise<void>((resolve) => {
-      resolveProcessing = resolve;
-    });
-    processingInteractions.set(interaction.id, processingPromise);
-    
     // Log all interactions for debugging
     if (interaction.isButton()) {
       console.log(`🔘 [INTERACTION] Button interaction: ${interaction.customId}, User: ${interaction.user.id}, Deferred: ${interaction.deferred}, Replied: ${interaction.replied}`);
@@ -124,44 +128,40 @@ client.on(Events.InteractionCreate, async (interaction) => {
       console.log(`💬 [INTERACTION] Command: ${interaction.commandName}, User: ${interaction.user.id}`);
     }
 
-  if (interaction.isChatInputCommand()) {
-    if (interaction.commandName === 'explore') {
-      await handleExploreCommand(interaction);
-    } else if (interaction.commandName === 'wallet') {
-      const subcommand = interaction.options.getSubcommand();
-      if (subcommand === 'set') {
-        const address = interaction.options.getString('address', true);
-        await handleWalletSet(interaction, address);
-      } else if (subcommand === 'view') {
-        await handleWalletView(interaction);
+    if (interaction.isChatInputCommand()) {
+      if (interaction.commandName === 'explore') {
+        await handleExploreCommand(interaction);
+      } else if (interaction.commandName === 'wallet') {
+        const subcommand = interaction.options.getSubcommand();
+        if (subcommand === 'set') {
+          const address = interaction.options.getString('address', true);
+          await handleWalletSet(interaction, address);
+        } else if (subcommand === 'view') {
+          await handleWalletView(interaction);
+        }
+      } else if (interaction.commandName === 'inventory') {
+        await handleInventoryCommand(interaction);
+      } else if (interaction.commandName === 'party') {
+        const subcommand = interaction.options.getSubcommand();
+        if (subcommand === 'create') {
+          await handlePartyCreate(interaction);
+        }
+      } else if (interaction.commandName === 'debug') {
+        await handleDebugCommand(interaction);
+      } else if (interaction.commandName === 'repair') {
+        await handleRepairCommand(interaction);
+      } else if (interaction.commandName === 'endall') {
+        await handleEndAllCommand(interaction);
       }
-    } else if (interaction.commandName === 'inventory') {
-      await handleInventoryCommand(interaction);
-    } else if (interaction.commandName === 'party') {
-      const subcommand = interaction.options.getSubcommand();
-      if (subcommand === 'create') {
-        await handlePartyCreate(interaction);
+    } else if (interaction.isButton()) {
+      if (interaction.customId.startsWith('biome_')) {
+        await handleBiomeSelect(interaction);
+      } else if (interaction.customId.startsWith('duration_')) {
+        await handleDurationSelect(interaction);
+      } else if (interaction.customId.startsWith('party_join_')) {
+        await handlePartyJoin(interaction);
       }
-    } else if (interaction.commandName === 'debug') {
-      await handleDebugCommand(interaction);
-    } else if (interaction.commandName === 'repair') {
-      await handleRepairCommand(interaction);
-    } else if (interaction.commandName === 'endall') {
-      await handleEndAllCommand(interaction);
     }
-  } else if (interaction.isButton()) {
-    if (interaction.customId.startsWith('biome_')) {
-      await handleBiomeSelect(interaction);
-    } else if (interaction.customId.startsWith('duration_')) {
-      await handleDurationSelect(interaction);
-    } else if (interaction.customId.startsWith('party_join_')) {
-      await handlePartyJoin(interaction);
-    }
-  }
-    
-    // Mark interaction as complete
-    resolveProcessing!();
-    processingInteractions.delete(interaction.id);
   } catch (error) {
     console.error(`❌ [INTERACTION] Unhandled error in interaction handler:`, error);
     console.error(`❌ [INTERACTION] Error stack:`, error instanceof Error ? error.stack : String(error));
@@ -177,16 +177,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
     } catch (responseError) {
       console.error(`❌ [INTERACTION] Failed to send error response:`, responseError);
     }
-    
-    // Always clean up processing flag, even on error
-    if (processingInteractions.has(interaction.id)) {
-      processingInteractions.get(interaction.id)?.then(() => {
-        processingInteractions.delete(interaction.id);
-      });
-      processingInteractions.delete(interaction.id);
-    }
   }
-});
+  // Note: We don't remove from processedInteractions here because we want to prevent
+  // the same interaction ID from being processed again even after completion
+  });
+} else {
+  console.warn('⚠️ [INTERACTION] Interaction handler already registered, skipping duplicate registration');
+}
 
 // Handle errors
 client.on(Events.Error, (error) => {

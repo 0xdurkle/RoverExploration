@@ -128,28 +128,42 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
     // Check if message was already sent for this exploration ID (atomic check)
     const channelId = process.env.DISCORD_CHANNEL_ID;
     if (channelId && explorationId) {
-      // Atomic check-and-set: if explorationId is already in set, message was already sent
+      // Double-check: verify exploration exists and was just created
+      const { getDb } = await import('../db/connection');
+      const db = getDb();
+      const verifyExploration = await db.query(
+        `SELECT id, created_at FROM explorations WHERE id = $1`,
+        [explorationId]
+      );
+      
+      if (verifyExploration.rows.length === 0) {
+        console.error(`⏱️ [DURATION_SELECT] ❌ Exploration ${explorationId} not found in database, not sending message`);
+        return;
+      }
+      
+      // Check if message was already sent for this exploration ID
       if (sentMessages.has(explorationId)) {
         console.log(`⏱️ [DURATION_SELECT] ⚠️ Message already sent for exploration ${explorationId}, skipping duplicate`);
-      } else {
-        // Mark as sent BEFORE sending (prevents race condition)
-        sentMessages.add(explorationId);
-        
-        try {
-          console.log(`⏱️ [DURATION_SELECT] Sending public message for exploration ${explorationId}`);
-          const publicChannel = await interaction.client.channels.fetch(channelId);
-          if (publicChannel && publicChannel.isTextBased()) {
-            const userMention = `<@${userId}>`;
-            const message = getExplorationStartMessage(userMention, `**${biome.name}**`, `**${durationText}**`);
-            await (publicChannel as TextChannel).send(message);
-            console.log(`⏱️ [DURATION_SELECT] ✅ Sent public exploration start message for exploration ${explorationId}`);
-          }
-        } catch (error) {
-          console.error(`⏱️ [DURATION_SELECT] ❌ Error sending public exploration start message:`, error);
-          // Remove from sent set on error so it can be retried if needed
-          sentMessages.delete(explorationId);
-          // Don't fail the exploration if the public message fails
+        return;
+      }
+      
+      // Mark as sent BEFORE sending (prevents race condition)
+      sentMessages.add(explorationId);
+      
+      try {
+        console.log(`⏱️ [DURATION_SELECT] Sending public message for exploration ${explorationId}`);
+        const publicChannel = await interaction.client.channels.fetch(channelId);
+        if (publicChannel && publicChannel.isTextBased()) {
+          const userMention = `<@${userId}>`;
+          const message = getExplorationStartMessage(userMention, `**${biome.name}**`, `**${durationText}**`);
+          await (publicChannel as TextChannel).send(message);
+          console.log(`⏱️ [DURATION_SELECT] ✅ Sent public exploration start message for exploration ${explorationId}`);
         }
+      } catch (error) {
+        console.error(`⏱️ [DURATION_SELECT] ❌ Error sending public exploration start message:`, error);
+        // Remove from sent set on error so it can be retried if needed
+        sentMessages.delete(explorationId);
+        // Don't fail the exploration if the public message fails
       }
     }
   } catch (error) {

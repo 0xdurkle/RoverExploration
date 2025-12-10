@@ -49,33 +49,17 @@ export async function createExploration(
   const startedAt = new Date();
   const endsAt = new Date(startedAt.getTime() + durationHours * HOURS_TO_MILLISECONDS);
 
-  // Use PostgreSQL advisory lock based on user ID hash to prevent concurrent explorations
-  // This ensures only one exploration can be created per user at a time, even with race conditions
-  const lockId = `hashtext('${userId}')`; // Use hashtext for consistent integer lock ID
-  
   try {
-    // Use transaction with advisory lock to prevent race conditions
+    // Use transaction with row-level locking to prevent race conditions
     await db.query('BEGIN');
     
     try {
-      // Acquire advisory lock for this user (blocks other requests for same user)
-      // Lock ID is based on user ID hash to ensure same user gets same lock
-      const lockAcquired = await db.query(
-        `SELECT pg_try_advisory_xact_lock(hashtext($1::text)) as acquired`,
-        [userId]
-      );
-      
-      if (!lockAcquired.rows[0]?.acquired) {
-        // Lock not acquired - another transaction is processing for this user
-        await db.query('ROLLBACK');
-        throw new Error(`User ${userId} already has an active exploration (concurrent request detected)`);
-      }
-      
-      // Check for existing active exploration (with lock held, this is safe)
+      // First, check for existing active exploration and lock it
+      // This prevents concurrent requests from both creating explorations
       const existingResult = await db.query(
         `SELECT id FROM explorations 
          WHERE user_id = $1 AND ends_at > $2 AND completed = FALSE 
-         LIMIT 1`,
+         FOR UPDATE NOWAIT`,
         [userId, startedAt]
       );
       
