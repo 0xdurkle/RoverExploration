@@ -16,6 +16,18 @@ import { safeDeferUpdate, safeEditReply, safeFollowUp } from '../utils/interacti
 const processingInteractions = new Set<string>();
 const processingUsers = new Map<string, number>(); // Map user ID to timestamp
 
+// Track which exploration IDs have had their public message sent
+// This prevents duplicate messages even if handler is called multiple times
+const sentMessages = new Set<number>();
+
+// Clean up old sent message tracking periodically
+setInterval(() => {
+  if (sentMessages.size > 100) {
+    sentMessages.clear();
+    console.log(`🧹 [DURATION_SELECT] Cleared sent messages cache`);
+  }
+}, 60000); // Every minute
+
 /**
  * Handle duration selection button click
  */
@@ -168,6 +180,13 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
           return;
         }
         
+        // CRITICAL: Check if message was already sent for this exploration ID
+        // This is the final guarantee - even if handler runs twice, only one message per exploration
+        if (sentMessages.has(explorationId)) {
+          console.log(`⏱️ [DURATION_SELECT] ⚠️ Message already sent for exploration ${explorationId}, skipping duplicate`);
+          return;
+        }
+        
         // Only send if this exploration was created very recently (within last 2 seconds)
         // This prevents sending message for old explorations if handler is called multiple times
         const createdTime = new Date(checkExploration.rows[0].created_at).getTime();
@@ -178,6 +197,9 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
           console.log(`⏱️ [DURATION_SELECT] ⚠️ Exploration ${explorationId} is ${age}ms old, not sending message (likely duplicate handler call)`);
           return;
         }
+        
+        // Mark as sent BEFORE sending (prevents race condition)
+        sentMessages.add(explorationId);
         
         console.log(`⏱️ [DURATION_SELECT] Sending public message for exploration ${explorationId} (created ${age}ms ago)`);
         const publicChannel = await interaction.client.channels.fetch(channelId);
