@@ -1,6 +1,7 @@
 import {
   ChatInputCommandInteraction,
   SlashCommandBuilder,
+  SlashCommandOptionsOnlyBuilder,
   TextChannel,
 } from 'discord.js';
 import { startExploration } from '../services/explorationService';
@@ -14,7 +15,7 @@ import { safeDeferReply, safeEditReply } from '../utils/interactionHelpers';
 /**
  * Get command builder for /explore
  */
-export function getExploreCommandBuilder(): SlashCommandBuilder {
+export function getExploreCommandBuilder(): SlashCommandOptionsOnlyBuilder {
   const biomes = getAllBiomes();
   
   return new SlashCommandBuilder()
