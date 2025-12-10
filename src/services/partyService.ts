@@ -160,6 +160,7 @@ export function cleanupOldParties(): void {
  * - +1% uncommon
  * - +0.5% rare
  * - +0.25% legendary
+ * - +0.15% epic
  */
 export function calculatePartyBonus(partySize: number, rarity: string): number {
   // Additional members = partySize - 1 (excluding creator)
@@ -179,6 +180,7 @@ export function calculatePartyBonus(partySize: number, rarity: string): number {
     uncommon: 0.01, // +1% per additional member
     rare: 0.005, // +0.5% per additional member
     legendary: 0.0025, // +0.25% per additional member
+    epic: 0.0015, // +0.15% per additional member
   };
 
   const rarityBonus = (rarityBonuses[rarity.toLowerCase()] || 0) * effectiveAdditional;

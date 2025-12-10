@@ -164,7 +164,7 @@ export async function finishExploration(
   if (discovered) {
     console.log(`🎯 [FINISH_EXPLORATION] Item discovered, validating...`);
     // Validate that the discovered rarity is valid
-    const validRarities: Array<'uncommon' | 'rare' | 'legendary'> = ['uncommon', 'rare', 'legendary'];
+    const validRarities: Array<'uncommon' | 'rare' | 'legendary' | 'epic'> = ['uncommon', 'rare', 'legendary', 'epic'];
     if (!validRarities.includes(discovered.rarity)) {
       console.error(`🎯 [FINISH_EXPLORATION] ❌ Invalid rarity "${discovered.rarity}" for item "${discovered.name}"`);
       throw new Error(`Invalid rarity "${discovered.rarity}" for item "${discovered.name}"`);

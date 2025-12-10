@@ -5,6 +5,11 @@
       "name": "Crystal Caverns",
       "items": [
         {
+          "name": "Rover Head Fragment",
+          "rarity": "epic",
+          "baseProbability": 0.00015
+        },
+        {
           "name": "Shard of Echoing Quartz",
           "rarity": "uncommon",
           "baseProbability": 0.07
@@ -26,6 +31,11 @@
       "name": "Withered Woods",
       "items": [
         {
+          "name": "Rover Body Fragment",
+          "rarity": "epic",
+          "baseProbability": 0.00015
+        },
+        {
           "name": "Hollowwood Husk",
           "rarity": "uncommon",
           "baseProbability": 0.07
@@ -46,6 +56,11 @@
       "id": "rainforest_ruins",
       "name": "Rainforest Ruins",
       "items": [
+        {
+          "name": "Rover Wheel Fragment",
+          "rarity": "epic",
+          "baseProbability": 0.00015
+        },
         {
           "name": "Moss-Veiled Relic",
           "rarity": "uncommon",
@@ -89,6 +104,7 @@
   "rarityEmojis": {
     "uncommon": "🍃",
     "rare": "✨",
-    "legendary": "💎"
+    "legendary": "💎",
+    "epic": "🌟"
   }
 }

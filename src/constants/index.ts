@@ -14,8 +14,9 @@ export const PARTY_CLEANUP_DELAY_MS = 300000; // 5 minutes
 // Floating point comparison tolerance
 export const FLOAT_COMPARISON_TOLERANCE = 0.0001;
 
-// Rarity order for sorting
+// Rarity order for sorting (lower number = checked first, rarer)
 export const RARITY_ORDER: Record<string, number> = {
+  epic: -1,
   legendary: 0,
   rare: 1,
   uncommon: 2,
@@ -26,5 +27,6 @@ export const TEST_PROBABILITIES = {
   uncommon: 0.25, // 25%
   rare: 0.125, // 12.5%
   legendary: 0.05, // 5%
+  epic: 0.01, // 1%
 };
 

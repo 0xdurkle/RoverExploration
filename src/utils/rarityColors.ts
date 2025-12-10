@@ -6,6 +6,7 @@ export const RARITY_COLORS: Record<string, number> = {
   uncommon: 0x22c55e, // Green
   rare: 0x3b82f6, // Blue
   legendary: 0xa855f7, // Purple
+  epic: 0xffd700, // Gold
 };
 
 /**

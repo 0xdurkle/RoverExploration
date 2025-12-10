@@ -14,7 +14,7 @@ interface Biome {
 
 interface Item {
   name: string;
-  rarity: 'uncommon' | 'rare' | 'legendary';
+  rarity: 'uncommon' | 'rare' | 'legendary' | 'epic';
   baseProbability: number;
 }
 
@@ -30,7 +30,7 @@ interface Duration {
  */
 export function discoverItem(biomeId: string, durationHours: number): {
   name: string;
-  rarity: 'uncommon' | 'rare' | 'legendary';
+  rarity: 'uncommon' | 'rare' | 'legendary' | 'epic';
 } | null {
   const biome = (biomesData.biomes as Biome[]).find(b => b.id === biomeId);
   if (!biome) {
@@ -105,6 +105,6 @@ export function getDurationMultiplier(durationHours: number): number {
 /**
  * Get rarity emoji
  */
-export function getRarityEmoji(rarity: 'uncommon' | 'rare' | 'legendary'): string {
+export function getRarityEmoji(rarity: 'uncommon' | 'rare' | 'legendary' | 'epic'): string {
   return biomesData.rarityEmojis[rarity] || '⚪';
 }

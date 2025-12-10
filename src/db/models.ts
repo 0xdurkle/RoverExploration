@@ -16,7 +16,7 @@ export interface Exploration {
 
 export interface ItemFound {
   name: string;
-  rarity: 'uncommon' | 'rare' | 'legendary';
+  rarity: 'uncommon' | 'rare' | 'legendary' | 'epic';
   biome: string;
   found_at: Date;
 }
@@ -286,7 +286,7 @@ async function updateUserProfile(
       if (itemFound) {
         console.log(`📋 [UPDATE_USER_PROFILE] Processing item to add:`, JSON.stringify(itemFound, null, 2));
         // Validate rarity before saving
-        const validRarities: Array<'uncommon' | 'rare' | 'legendary'> = ['uncommon', 'rare', 'legendary'];
+        const validRarities: Array<'uncommon' | 'rare' | 'legendary' | 'epic'> = ['uncommon', 'rare', 'legendary', 'epic'];
         if (!validRarities.includes(itemFound.rarity)) {
           console.error(`📋 [UPDATE_USER_PROFILE] ❌ Invalid rarity "${itemFound.rarity}" for item "${itemFound.name}" when saving to database`);
           throw new Error(`Invalid rarity "${itemFound.rarity}" for item "${itemFound.name}"`);

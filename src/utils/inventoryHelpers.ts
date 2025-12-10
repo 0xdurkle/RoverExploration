@@ -149,7 +149,7 @@ export function buildItemCounts(itemsFound: ItemFound[]): ItemCount[] {
       }
       
       // Validate rarity is valid
-      const validRarities = ['uncommon', 'rare', 'legendary'];
+      const validRarities = ['uncommon', 'rare', 'legendary', 'epic'];
       const safeRarity = validRarities.includes(finalRarity) ? finalRarity : 'uncommon';
       
       console.log(`     Final values - rarity: ${safeRarity}, biome: ${finalBiome}`);
@@ -159,7 +159,7 @@ export function buildItemCounts(itemsFound: ItemFound[]): ItemCount[] {
         count,
         rarity: safeRarity,
         biome: finalBiome,
-        emoji: getRarityEmoji(safeRarity as 'uncommon' | 'rare' | 'legendary'),
+        emoji: getRarityEmoji(safeRarity as 'uncommon' | 'rare' | 'legendary' | 'epic'),
       };
       
       console.log(`     ✅ Adding item:`, JSON.stringify(itemToAdd));
@@ -184,7 +184,7 @@ export function buildItemCounts(itemsFound: ItemFound[]): ItemCount[] {
         count: 0,
         rarity: item.rarity,
         biome: item.biome,
-        emoji: getRarityEmoji(item.rarity as 'uncommon' | 'rare' | 'legendary'),
+        emoji: getRarityEmoji(item.rarity as 'uncommon' | 'rare' | 'legendary' | 'epic'),
       });
       processedItemNames.add(item.name);
     }
@@ -252,7 +252,7 @@ export function buildBiomeProgress(itemsFound: ItemFound[]): BiomeProgress[] {
         count,
         rarity: rarity,
         biome: biome.name,
-        emoji: getRarityEmoji(rarity as 'uncommon' | 'rare' | 'legendary'),
+        emoji: getRarityEmoji(rarity as 'uncommon' | 'rare' | 'legendary' | 'epic'),
       });
     });
 

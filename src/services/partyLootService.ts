@@ -20,7 +20,7 @@ interface Biome {
 
 interface Item {
   name: string;
-  rarity: 'uncommon' | 'rare' | 'legendary';
+  rarity: 'uncommon' | 'rare' | 'legendary' | 'epic';
   baseProbability: number;
 }
 
@@ -30,7 +30,7 @@ interface Item {
  */
 export function rollPartyLoot(biomeId: string, durationHours: number, partySize: number): {
   name: string;
-  rarity: 'uncommon' | 'rare' | 'legendary';
+  rarity: 'uncommon' | 'rare' | 'legendary' | 'epic';
 } | null {
   const biome = (biomesData.biomes as Biome[]).find((b) => b.id === biomeId);
   if (!biome) {

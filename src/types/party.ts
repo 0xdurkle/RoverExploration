@@ -9,7 +9,7 @@ export interface PartyMember {
 
 export interface PartyLootResult {
   name: string;
-  rarity: 'uncommon' | 'rare' | 'legendary';
+  rarity: 'uncommon' | 'rare' | 'legendary' | 'epic';
 }
 
 export interface Party {
