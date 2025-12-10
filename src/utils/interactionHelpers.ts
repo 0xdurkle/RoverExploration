@@ -57,8 +57,11 @@ export async function safeEditReply(
     // Try followUp as fallback (only for repliable interactions)
     try {
       if (interaction.isRepliable()) {
+        // Extract only the properties we need for followUp
         const followUpOptions: Parameters<RepliableInteraction['followUp']>[0] = {
-          ...(typeof options === 'object' ? options : {}),
+          content: typeof options === 'object' && options && 'content' in options ? options.content : undefined,
+          embeds: typeof options === 'object' && options && 'embeds' in options ? options.embeds : undefined,
+          components: typeof options === 'object' && options && 'components' in options ? options.components : undefined,
           ephemeral: true,
         };
         await interaction.followUp(followUpOptions);
