@@ -6,12 +6,42 @@ import { getExplorationStartMessage } from '../utils/messageVariations';
 import { HOURS_TO_MILLISECONDS } from '../constants';
 import { safeDeferUpdate, safeEditReply, safeFollowUp } from '../utils/interactionHelpers';
 
+// Track processing interactions to prevent duplicates
+const processingInteractions = new Set<string>();
+const processingUsers = new Set<string>();
+
 /**
  * Handle duration selection button click
  */
 export async function handleDurationSelect(interaction: ButtonInteraction): Promise<void> {
+  // Prevent duplicate processing of the same interaction
+  if (processingInteractions.has(interaction.id)) {
+    console.log(`⏱️ [DURATION_SELECT] Interaction ${interaction.id} already being processed, ignoring duplicate`);
+    return;
+  }
+
+  // Prevent duplicate processing for the same user (race condition protection)
+  const userId = interaction.user.id;
+  if (processingUsers.has(userId)) {
+    console.log(`⏱️ [DURATION_SELECT] User ${userId} already has an exploration being started, ignoring duplicate`);
+    try {
+      await safeDeferUpdate(interaction);
+      await safeEditReply(interaction, {
+        content: '⚠️ An exploration is already being started. Please wait a moment.',
+        components: [],
+      });
+    } catch (error) {
+      // Ignore errors if interaction expired
+    }
+    return;
+  }
+
   try {
-    console.log(`⏱️ [DURATION_SELECT] Handling duration selection for interaction ${interaction.id}`);
+    // Mark as processing
+    processingInteractions.add(interaction.id);
+    processingUsers.add(userId);
+    
+    console.log(`⏱️ [DURATION_SELECT] Handling duration selection for interaction ${interaction.id}, user ${userId}`);
     
     // Safely defer the update IMMEDIATELY
     const deferred = await safeDeferUpdate(interaction);
@@ -42,10 +72,10 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
     }
 
     // Double-check cooldown (user might have clicked multiple times)
-    console.log(`⏱️ [DURATION_SELECT] Checking cooldown for user ${interaction.user.id}...`);
-    const remaining = await getCooldownRemaining(interaction.user.id);
+    console.log(`⏱️ [DURATION_SELECT] Checking cooldown for user ${userId}...`);
+    const remaining = await getCooldownRemaining(userId);
     if (remaining && remaining > 0) {
-      console.log(`⏱️ [DURATION_SELECT] User ${interaction.user.id} has active cooldown: ${remaining}ms`);
+      console.log(`⏱️ [DURATION_SELECT] User ${userId} has active cooldown: ${remaining}ms`);
       await safeEditReply(interaction, {
         content: '⚠️ You already have an active exploration. Please wait for it to complete.',
         components: [],
@@ -54,9 +84,12 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
     }
 
     // Start exploration
-    console.log(`⏱️ [DURATION_SELECT] Starting exploration for user ${interaction.user.id}, biome ${biomeId}, duration ${durationHours}h`);
-    await startExploration(interaction.user.id, biomeId, durationHours);
+    console.log(`⏱️ [DURATION_SELECT] Starting exploration for user ${userId}, biome ${biomeId}, duration ${durationHours}h`);
+    await startExploration(userId, biomeId, durationHours);
     console.log(`⏱️ [DURATION_SELECT] ✅ Exploration started successfully`);
+    
+    // Mark user as having active exploration to prevent duplicates
+    // This will be cleared when exploration completes
 
     const multiplier = getDurationMultiplier(durationHours);
     const multiplierText = multiplier > 1 ? ` (${multiplier}x item odds)` : '';
@@ -84,13 +117,13 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
       console.error(`⏱️ [DURATION_SELECT] ⚠️ Failed to update interaction ${interaction.id}, but exploration was started`);
     }
 
-    // Send public message to the channel
+    // Send public message to the channel (only once)
     const channelId = process.env.DISCORD_CHANNEL_ID;
     if (channelId && interaction.channel) {
       try {
         const publicChannel = await interaction.client.channels.fetch(channelId);
         if (publicChannel && publicChannel.isTextBased()) {
-          const userMention = `<@${interaction.user.id}>`;
+          const userMention = `<@${userId}>`;
           const message = getExplorationStartMessage(userMention, `**${biome.name}**`, `**${durationText}**`);
           await (publicChannel as TextChannel).send(message);
           console.log(`⏱️ [DURATION_SELECT] ✅ Sent public exploration start message`);
@@ -117,5 +150,13 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
         ephemeral: true,
       });
     }
+  } finally {
+    // Always clear processing flags
+    processingInteractions.delete(interaction.id);
+    // Clear user processing flag after a short delay to allow for immediate retry prevention
+    setTimeout(() => {
+      processingUsers.delete(userId);
+      console.log(`⏱️ [DURATION_SELECT] Cleared processing flag for user ${userId}`);
+    }, 2000); // 2 second cooldown to prevent rapid double-clicks
   }
 }
