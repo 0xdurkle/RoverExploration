@@ -50,6 +50,9 @@ export async function finishExploration(
       biome: biome,
       found_at: new Date(),
     };
+    console.log(`🎁 Item discovered: ${itemFound.name} (${itemFound.rarity}) for user ${userId} in ${biome}`);
+  } else {
+    console.log(`📭 No item found for user ${userId} in ${biome}`);
   }
 
   // Mark exploration as completed

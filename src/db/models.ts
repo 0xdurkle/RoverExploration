@@ -138,26 +138,54 @@ async function updateUserProfile(
 
   if (existing.rows[0]) {
     // Update existing profile
-    const itemsFound = existing.rows[0].items_found || [];
+    // PostgreSQL JSONB is automatically parsed, but handle null/undefined cases
+    let itemsFound: any[] = [];
+    const rawItemsFound = existing.rows[0].items_found;
+    
+    if (Array.isArray(rawItemsFound)) {
+      itemsFound = [...rawItemsFound]; // Create a copy to avoid mutating
+    } else if (rawItemsFound && typeof rawItemsFound === 'string') {
+      // Handle case where it's still a string (shouldn't happen but be safe)
+      itemsFound = JSON.parse(rawItemsFound);
+    } else if (rawItemsFound) {
+      // Handle other cases
+      itemsFound = [rawItemsFound];
+    }
+
     if (itemFound) {
-      itemsFound.push(itemFound);
+      // Ensure itemFound has all required fields
+      const itemToSave: ItemFound = {
+        name: itemFound.name,
+        rarity: itemFound.rarity,
+        biome: itemFound.biome,
+        found_at: itemFound.found_at instanceof Date ? itemFound.found_at : new Date(itemFound.found_at),
+      };
+      itemsFound.push(itemToSave);
+      console.log(`✅ Adding item "${itemToSave.name}" to user ${userId}'s inventory. Total items: ${itemsFound.length}`);
     }
 
     await db.query(
       `UPDATE user_profiles
        SET total_explorations = total_explorations + 1,
-           items_found = $1,
+           items_found = $1::jsonb,
            last_exploration_end = $2
        WHERE user_id = $3`,
       [JSON.stringify(itemsFound), lastExplorationEnd, userId]
     );
+    console.log(`✅ Updated profile for user ${userId}. Total explorations: ${existing.rows[0].total_explorations + 1}, Items: ${itemsFound.length}`);
   } else {
     // Create new profile
     const itemsFound = itemFound ? [itemFound] : [];
 
+    if (itemFound) {
+      console.log(`✅ Creating new profile for user ${userId} with item "${itemFound.name}"`);
+    } else {
+      console.log(`✅ Creating new profile for user ${userId} (no item found)`);
+    }
+
     await db.query(
       `INSERT INTO user_profiles (user_id, total_explorations, items_found, last_exploration_end)
-       VALUES ($1, 1, $2, $3)`,
+       VALUES ($1, 1, $2::jsonb, $3)`,
       [userId, JSON.stringify(itemsFound), lastExplorationEnd]
     );
   }
@@ -179,9 +207,26 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
   }
 
   const profile = result.rows[0];
+  
+  // Ensure items_found is always an array
+  let itemsFound: ItemFound[] = [];
+  if (Array.isArray(profile.items_found)) {
+    itemsFound = profile.items_found;
+  } else if (profile.items_found && typeof profile.items_found === 'string') {
+    itemsFound = JSON.parse(profile.items_found);
+  } else if (profile.items_found) {
+    itemsFound = [profile.items_found];
+  }
+
+  // Parse dates in items_found
+  itemsFound = itemsFound.map((item: any) => ({
+    ...item,
+    found_at: item.found_at instanceof Date ? item.found_at : new Date(item.found_at),
+  }));
+
   return {
     ...profile,
-    items_found: profile.items_found || [],
+    items_found: itemsFound,
     last_exploration_end: profile.last_exploration_end || null,
   };
 }
