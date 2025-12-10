@@ -9,7 +9,6 @@ import { handlePartyCreate, getPartyCommandBuilder } from './commands/party';
 import { handleDebugCommand, getDebugCommandBuilder } from './commands/debug';
 import { handleRepairCommand, getRepairCommandBuilder } from './commands/repair';
 import { handleEndAllCommand, getEndAllCommandBuilder } from './commands/endAll';
-import { handleRoversWillCommand, getRoversWillCommandBuilder } from './commands/roverswill';
 import { handlePartyJoin } from './handlers/partyJoin';
 import { checkAndProcessExplorations } from './jobs/checkExplorations';
 
@@ -52,7 +51,6 @@ client.once(Events.ClientReady, async (readyClient) => {
       getDebugCommandBuilder().toJSON(),
       getRepairCommandBuilder().toJSON(),
       getEndAllCommandBuilder().toJSON(),
-      getRoversWillCommandBuilder().toJSON(),
     ];
 
     if (guildId) {
@@ -149,8 +147,6 @@ if (!interactionHandlerRegistered) {
         await handleRepairCommand(interaction);
       } else if (interaction.commandName === 'endall') {
         await handleEndAllCommand(interaction);
-      } else if (interaction.commandName === 'roverswill') {
-        await handleRoversWillCommand(interaction);
       }
     } else if (interaction.isButton()) {
       if (interaction.customId.startsWith('party_join_')) {
@@ -179,6 +175,17 @@ if (!interactionHandlerRegistered) {
 } else {
   console.warn('⚠️ [INTERACTION] Interaction handler already registered, skipping duplicate registration');
 }
+
+// Handle !roverswill message command
+client.on(Events.MessageCreate, async (message) => {
+  // Ignore bot messages
+  if (message.author.bot) return;
+  
+  // Check if message starts with !roverswill
+  if (message.content.toLowerCase().trim() === '!roverswill') {
+    await message.channel.send('save us');
+  }
+});
 
 // Handle errors
 client.on(Events.Error, (error) => {
