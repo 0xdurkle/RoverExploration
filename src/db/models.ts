@@ -27,7 +27,7 @@ export interface UserProfile {
   total_explorations: number;
   items_found: ItemFound[];
   last_exploration_end: Date | null;
-  total_distance_km: number;
+  total_distance_km: number | null;
   created_at: Date;
 }
 
@@ -550,6 +550,7 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
     ...profile,
     items_found: itemsFound,
     last_exploration_end: profile.last_exploration_end || null,
+    total_distance_km: profile.total_distance_km ?? 0,
   };
 }
 
