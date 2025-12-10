@@ -12,21 +12,32 @@ export async function handleRepairCommand(interaction: ChatInputCommandInteracti
     const userId = interaction.user.id;
     const db = getDb();
 
-    // Get all completed explorations for this user that have items
+    // Get ALL completed explorations for this user (including ones with NULL items)
     const explorationsResult = await db.query(
-      `SELECT id, biome, item_found, completed, ends_at 
+      `SELECT id, biome, item_found, completed, ends_at, created_at
        FROM explorations 
-       WHERE user_id = $1 AND completed = TRUE AND item_found IS NOT NULL
+       WHERE user_id = $1 AND completed = TRUE
        ORDER BY ends_at ASC`,
       [userId]
     );
+    
+    console.log(`🔧 Repair: Found ${explorationsResult.rows.length} completed explorations for user ${userId}`);
 
     if (explorationsResult.rows.length === 0) {
       await interaction.editReply({
-        content: '❌ No completed explorations with items found.',
+        content: '❌ No completed explorations found.',
       });
       return;
     }
+    
+    // Log all explorations for debugging
+    console.log(`🔧 Repair: All completed explorations:`);
+    explorationsResult.rows.forEach((exp, idx) => {
+      const itemInfo = exp.item_found 
+        ? (typeof exp.item_found === 'string' ? JSON.parse(exp.item_found) : exp.item_found)
+        : 'NULL';
+      console.log(`   ${idx + 1}. ID: ${exp.id}, Biome: ${exp.biome}, Item: ${itemInfo?.name || 'None'}`);
+    });
 
     // Get current user profile
     const profileResult = await db.query(
@@ -46,22 +57,36 @@ export async function handleRepairCommand(interaction: ChatInputCommandInteracti
 
     // Collect all items from explorations (keep ALL instances, including duplicates)
     const itemsFromExplorations: ItemFound[] = [];
+    const explorationsWithItems = explorationsResult.rows.filter(exp => exp.item_found !== null && exp.item_found !== undefined);
+    
+    console.log(`🔧 Repair: ${explorationsWithItems.length} out of ${explorationsResult.rows.length} explorations have items`);
     
     explorationsResult.rows.forEach((exp) => {
       if (exp.item_found) {
-        let itemData: ItemFound;
-        if (typeof exp.item_found === 'string') {
-          itemData = JSON.parse(exp.item_found);
-        } else {
-          itemData = exp.item_found;
+        try {
+          let itemData: ItemFound;
+          if (typeof exp.item_found === 'string') {
+            itemData = JSON.parse(exp.item_found);
+          } else {
+            itemData = exp.item_found;
+          }
+          
+          if (itemData && itemData.name && itemData.rarity) {
+            itemsFromExplorations.push({
+              name: itemData.name,
+              rarity: itemData.rarity,
+              biome: itemData.biome || exp.biome,
+              found_at: itemData.found_at ? new Date(itemData.found_at) : new Date(exp.ends_at),
+            });
+            console.log(`   ✅ Found item: ${itemData.name} (${itemData.rarity}) from exploration ${exp.id}`);
+          } else {
+            console.error(`   ❌ Invalid item data in exploration ${exp.id}:`, itemData);
+          }
+        } catch (e) {
+          console.error(`   ❌ Error parsing item_found for exploration ${exp.id}:`, e);
         }
-        
-        itemsFromExplorations.push({
-          name: itemData.name,
-          rarity: itemData.rarity,
-          biome: itemData.biome || exp.biome,
-          found_at: itemData.found_at ? new Date(itemData.found_at) : new Date(exp.ends_at),
-        });
+      } else {
+        console.log(`   ⚠️ Exploration ${exp.id} (${exp.biome}) has no item_found`);
       }
     });
 
@@ -106,8 +131,19 @@ export async function handleRepairCommand(interaction: ChatInputCommandInteracti
     });
 
     if (missingItems.length === 0) {
+      let response = '✅ All items from explorations are in your inventory.\n\n';
+      response += `**Summary:**\n`;
+      response += `- Explorations checked: ${explorationsResult.rows.length}\n`;
+      response += `- Explorations with items: ${explorationsWithItems.length}\n`;
+      response += `- Items found: ${itemsFromExplorations.length}\n`;
+      response += `- Items in inventory: ${currentItems.length}\n`;
+      
+      if (itemsFromExplorations.length < explorationsResult.rows.length) {
+        response += `\n⚠️ Note: ${explorationsResult.rows.length - explorationsWithItems.length} exploration(s) have no item saved. These cannot be recovered.`;
+      }
+      
       await interaction.editReply({
-        content: '✅ All items are already in your inventory. No repair needed!',
+        content: response,
       });
       return;
     }
@@ -125,11 +161,29 @@ export async function handleRepairCommand(interaction: ChatInputCommandInteracti
 
     const itemList = missingItems.map(item => `${item.name} (${item.rarity})`).join(', ');
     
+    let response = `✅ Repair complete! Added ${missingItems.length} missing item(s):\n${itemList}\n\n`;
+    response += `**Details:**\n`;
+    response += `- Total explorations: ${explorationsResult.rows.length}\n`;
+    response += `- Explorations with items in DB: ${explorationsWithItems.length}\n`;
+    response += `- Items found in explorations table: ${itemsFromExplorations.length}\n`;
+    response += `- Items in your inventory (before): ${currentItems.length}\n`;
+    response += `- Items added: ${missingItems.length}\n`;
+    response += `- Items in your inventory (after): ${allItems.length}\n\n`;
+    
+    if (itemsFromExplorations.length < explorationsResult.rows.length) {
+      const missingFromDB = explorationsResult.rows.length - explorationsWithItems.length;
+      response += `⚠️ **Warning:** ${missingFromDB} exploration(s) have no item saved in the database. These items cannot be recovered automatically.\n`;
+      response += `If you saw Discord messages about items but they're missing, those items were never saved to the database.\n`;
+    }
+    
+    response += `\nRun \`/inventory\` to see your updated inventory.`;
+    
     await interaction.editReply({
-      content: `✅ Repair complete! Added ${missingItems.length} missing item(s):\n${itemList}\n\nRun \`/inventory\` to see your updated inventory.`,
+      content: response,
     });
 
     console.log(`🔧 Repair: Added ${missingItems.length} missing items to user ${userId}`);
+    console.log(`🔧 Repair: Full summary - Explorations: ${explorationsResult.rows.length}, With items: ${explorationsWithItems.length}, Recovered: ${missingItems.length}`);
   } catch (error) {
     console.error('Error in repair command:', error);
     await interaction.editReply({
