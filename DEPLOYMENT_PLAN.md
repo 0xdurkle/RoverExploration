@@ -209,10 +209,10 @@ RoverExploration/
 - Process completed explorations
 - More reliable than in-memory timers (survives restarts)
 
-### **Button State Management**
-- Use Discord's interaction tokens to track state
-- Store session data in database immediately after duration selection
-- No need for complex state management
+### **Command Design**
+- Use slash command options (dropdown menus) for user input
+- Store exploration data in database immediately after command execution
+- Atomic database operations prevent duplicate messages
 
 ### **Database Schema**
 ```sql

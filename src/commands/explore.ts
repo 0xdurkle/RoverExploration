@@ -8,7 +8,6 @@ import { startExploration } from '../services/explorationService';
 import { getAllBiomes, getBiome, getDurationMultiplier } from '../services/rng';
 import { getCooldownRemaining, formatTimeRemaining } from '../services/cooldownService';
 import { getExplorationStartMessage } from '../utils/messageVariations';
-import { HOURS_TO_MILLISECONDS } from '../constants';
 import { markStartMessageSent } from '../db/models';
 import { safeDeferReply, safeEditReply } from '../utils/interactionHelpers';
 
@@ -45,7 +44,8 @@ export function getExploreCommandBuilder(): SlashCommandOptionsOnlyBuilder {
 
 /**
  * Handle /explore command
- * NEW APPROACH: Single command with options, no buttons, atomic message sending
+ * Uses slash command options (dropdown menus) for biome and duration selection
+ * Atomic database operation prevents duplicate messages
  */
 export async function handleExploreCommand(interaction: ChatInputCommandInteraction): Promise<void> {
   try {

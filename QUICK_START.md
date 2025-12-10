@@ -63,10 +63,9 @@ npm start
 
 ```
 src/
-├── commands/explore.ts          # /explore slash command
+├── commands/explore.ts          # /explore slash command (with dropdown options)
 ├── handlers/
-│   ├── biomeSelect.ts           # Biome button handler
-│   └── durationSelect.ts        # Duration button handler
+│   └── partyJoin.ts             # Party join button handler
 ├── services/
 │   ├── rng.ts                   # Item discovery logic
 │   ├── cooldownService.ts       # Cooldown checks
@@ -84,13 +83,12 @@ src/
 ## 🎮 How It Works
 
 1. User types `/explore` in Discord
-2. Bot shows 3 biome buttons (ephemeral message)
-3. User clicks a biome
-4. Bot shows 4 duration buttons (1h, 3h, 6h, 12h)
-5. User selects duration → exploration starts
-6. Bot stores exploration in database with `ends_at` timestamp
-7. Cron job checks every 2 minutes for completed explorations
-8. When timer ends, bot:
+2. User selects biome from dropdown menu
+3. User selects duration from dropdown menu (30s, 1h, 3h, 6h, 12h)
+4. Exploration starts immediately
+5. Bot stores exploration in database with `ends_at` timestamp
+6. Cron job checks every 10 seconds for completed explorations
+7. When timer ends, bot:
    - Rolls RNG for item discovery
    - Posts result in #underlog-exploration channel
    - Updates user profile

@@ -6,7 +6,7 @@ This document lists all public messages sent by the bot to the configured channe
 
 ## 1. Exploration Start Message
 
-**Location:** `src/handlers/durationSelect.ts` (line 70)
+**Location:** `src/commands/explore.ts` (line 127)
 
 **Current Message:**
 ```

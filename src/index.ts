@@ -11,7 +11,6 @@ import { handleRepairCommand, getRepairCommandBuilder } from './commands/repair'
 import { handleEndAllCommand, getEndAllCommandBuilder } from './commands/endAll';
 import { handlePartyJoin } from './handlers/partyJoin';
 import { checkAndProcessExplorations } from './jobs/checkExplorations';
-import { SlashCommandBuilder } from 'discord.js';
 
 // Load environment variables
 config();
@@ -98,6 +97,7 @@ setInterval(() => {
 
 // Handle slash commands and button interactions
 // Only register once to prevent duplicate event handlers
+// Note: Only party_join buttons are handled; explore uses slash command options
 if (!interactionHandlerRegistered) {
   interactionHandlerRegistered = true;
   console.log('✅ [INTERACTION] Registering interaction handler (single registration)');
@@ -113,7 +113,6 @@ if (!interactionHandlerRegistered) {
   
   // Mark as processed immediately to prevent race conditions
   processedInteractions.add(interaction.id);
-  
   
   // Add error handling wrapper
   try {
