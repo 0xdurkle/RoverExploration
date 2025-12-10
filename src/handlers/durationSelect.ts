@@ -16,10 +16,13 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
     // Safely defer the update IMMEDIATELY
     const deferred = await safeDeferUpdate(interaction);
     if (!deferred && !interaction.deferred && !interaction.replied) {
-      console.error(`⏱️ [DURATION_SELECT] Failed to defer interaction ${interaction.id}`);
-      return;
+      console.error(`⏱️ [DURATION_SELECT] Failed to defer interaction ${interaction.id} - interaction may have expired`);
+      // Interaction expired, but we should still try to save the exploration
+      // Don't return early - continue to save the exploration even if Discord interaction failed
+      console.log(`⏱️ [DURATION_SELECT] ⚠️ Continuing to save exploration despite expired interaction`);
+    } else {
+      console.log(`⏱️ [DURATION_SELECT] ✅ Interaction ${interaction.id} deferred, processing...`);
     }
-    console.log(`⏱️ [DURATION_SELECT] ✅ Interaction ${interaction.id} deferred, processing...`);
 
   // Parse customId: duration_{biomeId}_{hours}
   // Biome IDs contain underscores (e.g., "crystal_caverns"), so we need to split from the end

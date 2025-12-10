@@ -7,12 +7,32 @@ import {
 import { getCooldownRemaining, formatTimeRemaining } from '../services/cooldownService';
 import { getActiveExploration } from '../db/models';
 import { getAllBiomes } from '../services/rng';
+import { safeDeferReply, safeEditReply } from '../utils/interactionHelpers';
 
 /**
  * Handle /explore command
  */
 export async function handleExploreCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-  await interaction.deferReply({ ephemeral: true });
+  try {
+    console.log(`🌍 [EXPLORE] Handling /explore command for user ${interaction.user.id}`);
+    
+    // Safely defer the reply
+    const deferred = await safeDeferReply(interaction, { ephemeral: true });
+    if (!deferred && !interaction.deferred && !interaction.replied) {
+      console.error(`🌍 [EXPLORE] Failed to defer interaction ${interaction.id}, interaction may have expired`);
+      // Try to send a follow-up if possible
+      try {
+        if (interaction.isRepliable()) {
+          await interaction.followUp({
+            content: '⚠️ The interaction expired. Please try the command again.',
+            ephemeral: true,
+          });
+        }
+      } catch (followUpError) {
+        console.error(`🌍 [EXPLORE] Failed to send follow-up:`, followUpError);
+      }
+      return;
+    }
 
   const userId = interaction.user.id;
 
@@ -39,10 +59,32 @@ export async function handleExploreCommand(interaction: ChatInputCommandInteract
       .setStyle(ButtonStyle.Primary)
   );
 
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(buttons);
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(buttons);
 
-  await interaction.editReply({
-    content: '🌍 **Choose your biome:**',
-    components: [row],
-  });
+    const success = await safeEditReply(interaction, {
+      content: '🌍 **Choose your biome:**',
+      components: [row],
+    });
+
+    if (success) {
+      console.log(`🌍 [EXPLORE] ✅ Successfully sent biome selection to user ${interaction.user.id}`);
+    } else {
+      console.error(`🌍 [EXPLORE] ⚠️ Failed to send biome selection, but exploration check completed`);
+    }
+  } catch (error) {
+    console.error(`🌍 [EXPLORE] ❌ Error handling /explore command:`, error);
+    console.error(`🌍 [EXPLORE] Error stack:`, error instanceof Error ? error.stack : String(error));
+    
+    // Try to send error message
+    try {
+      if (interaction.isRepliable() && !interaction.replied) {
+        await interaction.followUp({
+          content: '❌ An error occurred. Please try again.',
+          ephemeral: true,
+        });
+      }
+    } catch (followUpError) {
+      console.error(`🌍 [EXPLORE] Failed to send error message:`, followUpError);
+    }
+  }
 }

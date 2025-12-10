@@ -7,24 +7,61 @@ import {
 
 /**
  * Safely defer an interaction update
- * Prevents "already acknowledged" errors
+ * Prevents "already acknowledged" and "unknown interaction" errors
  */
 export async function safeDeferUpdate(interaction: ButtonInteraction): Promise<boolean> {
   try {
+    // Check if already handled
     if (interaction.deferred || interaction.replied) {
       console.log(`⚠️ [INTERACTION] Interaction ${interaction.id} already deferred/replied, skipping`);
       return false;
     }
+    
+    // Try to defer - this must happen within 3 seconds of interaction creation
     await interaction.deferUpdate();
+    console.log(`✅ [INTERACTION] Successfully deferred interaction ${interaction.id}`);
     return true;
   } catch (error: any) {
-    // Ignore "already acknowledged" errors - they're harmless
+    // Ignore "already acknowledged" and "unknown interaction" errors - they're harmless
+    // Unknown interaction (10062) means the interaction expired (3 second window passed)
+    // Already acknowledged (40060) means we tried to respond twice
     if (error.code === 40060 || error.code === 10062) {
-      console.log(`⚠️ [INTERACTION] Interaction ${interaction.id} already acknowledged (code ${error.code}), continuing`);
+      console.log(`⚠️ [INTERACTION] Interaction ${interaction.id} expired/already acknowledged (code ${error.code}), continuing without defer`);
       return false;
     }
-    console.error(`❌ [INTERACTION] Error deferring update for interaction ${interaction.id}:`, error);
-    throw error;
+    console.error(`❌ [INTERACTION] Unexpected error deferring update for interaction ${interaction.id}:`, error);
+    // Don't throw - let the caller continue even if defer failed
+    return false;
+  }
+}
+
+/**
+ * Safely defer a reply for chat input commands
+ */
+export async function safeDeferReply(
+  interaction: ChatInputCommandInteraction,
+  options?: { ephemeral?: boolean }
+): Promise<boolean> {
+  try {
+    // Check if already handled
+    if (interaction.deferred || interaction.replied) {
+      console.log(`⚠️ [INTERACTION] Interaction ${interaction.id} already deferred/replied, skipping`);
+      return false;
+    }
+    
+    // Try to defer - this must happen within 3 seconds of interaction creation
+    await interaction.deferReply(options || { ephemeral: true });
+    console.log(`✅ [INTERACTION] Successfully deferred reply for interaction ${interaction.id}`);
+    return true;
+  } catch (error: any) {
+    // Ignore "already acknowledged" and "unknown interaction" errors
+    if (error.code === 40060 || error.code === 10062) {
+      console.log(`⚠️ [INTERACTION] Interaction ${interaction.id} expired/already acknowledged (code ${error.code}), continuing without defer`);
+      return false;
+    }
+    console.error(`❌ [INTERACTION] Unexpected error deferring reply for interaction ${interaction.id}:`, error);
+    // Don't throw - let the caller continue even if defer failed
+    return false;
   }
 }
 

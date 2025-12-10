@@ -17,8 +17,14 @@ export async function handleBiomeSelect(interaction: ButtonInteraction): Promise
     // Safely defer the update
     const deferred = await safeDeferUpdate(interaction);
     if (!deferred && !interaction.deferred && !interaction.replied) {
-      console.error(`🔘 [BIOME_SELECT] Failed to defer interaction ${interaction.id}`);
+      console.error(`🔘 [BIOME_SELECT] Failed to defer interaction ${interaction.id} - interaction may have expired`);
+      // Interaction expired, can't continue
       return;
+    }
+    
+    // If defer failed but interaction is already deferred/replied, we can continue
+    if (!deferred && (interaction.deferred || interaction.replied)) {
+      console.log(`🔘 [BIOME_SELECT] Interaction ${interaction.id} already deferred/replied, continuing...`);
     }
 
     const biomeId = interaction.customId.replace('biome_', '');
