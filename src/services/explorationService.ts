@@ -38,14 +38,26 @@ export async function finishExploration(
   biome: string,
   durationHours: number
 ): Promise<ItemFound | null> {
+  console.log(`\n🎯 [FINISH_EXPLORATION] ==========================================`);
+  console.log(`🎯 [FINISH_EXPLORATION] Starting for exploration ${explorationId}`);
+  console.log(`🎯 [FINISH_EXPLORATION] User ID: ${userId}`);
+  console.log(`🎯 [FINISH_EXPLORATION] Biome: ${biome}`);
+  console.log(`🎯 [FINISH_EXPLORATION] Duration: ${durationHours} hours`);
+  
   // CRITICAL: Check if exploration already has an item determined
   // This prevents re-rolling if the cron job processes it multiple times
   const { getDb } = await import('../db/connection');
   const db = getDb();
+  console.log(`🎯 [FINISH_EXPLORATION] Checking if exploration already has item...`);
   const existingExploration = await db.query(
     `SELECT item_found, completed FROM explorations WHERE id = $1`,
     [explorationId]
   );
+  console.log(`🎯 [FINISH_EXPLORATION] Existing exploration query result:`, {
+    found: existingExploration.rows.length > 0,
+    completed: existingExploration.rows[0]?.completed,
+    hasItem: !!existingExploration.rows[0]?.item_found
+  });
 
   if (existingExploration.rows[0]) {
     const existing = existingExploration.rows[0];
@@ -65,7 +77,9 @@ export async function finishExploration(
         biomeName = biomeData?.name || biomeName;
       }
       
-      console.log(`⚠️ Exploration ${explorationId} already completed with item: ${itemData.name} (${itemData.rarity})`);
+      console.log(`🎯 [FINISH_EXPLORATION] ⚠️ Exploration ${explorationId} already completed with item: ${itemData.name} (${itemData.rarity})`);
+      console.log(`🎯 [FINISH_EXPLORATION] Returning existing item, skipping discovery`);
+      console.log(`🎯 [FINISH_EXPLORATION] ==========================================\n`);
       return {
         name: itemData.name,
         rarity: itemData.rarity,
@@ -76,6 +90,7 @@ export async function finishExploration(
     
     // If item was already determined but not completed, use it
     if (existing.item_found && !existing.completed) {
+      console.log(`🎯 [FINISH_EXPLORATION] Item already determined but not completed, completing now...`);
       const itemData = typeof existing.item_found === 'string' 
         ? JSON.parse(existing.item_found) 
         : existing.item_found;
@@ -88,13 +103,15 @@ export async function finishExploration(
         biomeName = biomeData?.name || biomeName;
       }
       
-      console.log(`⚠️ Exploration ${explorationId} already has item determined: ${itemData.name} (${itemData.rarity}), completing now...`);
+      console.log(`🎯 [FINISH_EXPLORATION] ⚠️ Exploration ${explorationId} already has item determined: ${itemData.name} (${itemData.rarity}), completing now...`);
       await completeExploration(explorationId, {
         name: itemData.name,
         rarity: itemData.rarity,
         biome: biomeName,
         found_at: itemData.found_at ? new Date(itemData.found_at) : new Date(),
       });
+      console.log(`🎯 [FINISH_EXPLORATION] ✅ Completed exploration with existing item`);
+      console.log(`🎯 [FINISH_EXPLORATION] ==========================================\n`);
       return {
         name: itemData.name,
         rarity: itemData.rarity,
@@ -105,15 +122,18 @@ export async function finishExploration(
   }
 
   // Discover item using RNG (only if not already determined)
+  console.log(`🎯 [FINISH_EXPLORATION] No existing item found, discovering new item...`);
   const discovered = discoverItem(biome, durationHours);
+  console.log(`🎯 [FINISH_EXPLORATION] Discovery result:`, discovered ? `${discovered.name} (${discovered.rarity})` : 'null');
 
   let itemFound: ItemFound | null = null;
 
   if (discovered) {
+    console.log(`🎯 [FINISH_EXPLORATION] Item discovered, validating...`);
     // Validate that the discovered rarity is valid
     const validRarities: Array<'uncommon' | 'rare' | 'legendary'> = ['uncommon', 'rare', 'legendary'];
     if (!validRarities.includes(discovered.rarity)) {
-      console.error(`❌ Invalid rarity "${discovered.rarity}" for item "${discovered.name}"`);
+      console.error(`🎯 [FINISH_EXPLORATION] ❌ Invalid rarity "${discovered.rarity}" for item "${discovered.name}"`);
       throw new Error(`Invalid rarity "${discovered.rarity}" for item "${discovered.name}"`);
     }
     
@@ -121,6 +141,7 @@ export async function finishExploration(
     const { getBiome } = await import('./rng');
     const biomeData = getBiome(biome);
     const biomeName = biomeData?.name || biome; // Fallback to ID if biome not found
+    console.log(`🎯 [FINISH_EXPLORATION] Biome name: ${biomeName}`);
     
     itemFound = {
       name: discovered.name,
@@ -128,13 +149,17 @@ export async function finishExploration(
       biome: biomeName, // Store biome name, not ID
       found_at: new Date(),
     };
-    console.log(`🎁 Item discovered: ${itemFound.name} (${itemFound.rarity}) for user ${userId} in ${biomeName}`);
+    console.log(`🎯 [FINISH_EXPLORATION] 🎁 Item discovered: ${itemFound.name} (${itemFound.rarity}) for user ${userId} in ${biomeName}`);
+    console.log(`🎯 [FINISH_EXPLORATION] Item object:`, JSON.stringify(itemFound, null, 2));
   } else {
-    console.log(`📭 No item found for user ${userId} in ${biome}`);
+    console.log(`🎯 [FINISH_EXPLORATION] 📭 No item found for user ${userId} in ${biome}`);
   }
 
   // Mark exploration as completed
+  console.log(`🎯 [FINISH_EXPLORATION] Calling completeExploration...`);
   await completeExploration(explorationId, itemFound);
+  console.log(`🎯 [FINISH_EXPLORATION] ✅ completeExploration finished`);
+  console.log(`🎯 [FINISH_EXPLORATION] ==========================================\n`);
 
   return itemFound;
 }
