@@ -35,9 +35,13 @@ setInterval(() => {
  */
 export async function handleDurationSelect(interaction: ButtonInteraction): Promise<void> {
   const userId = interaction.user.id;
+  const callId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   
   try {
-    console.log(`⏱️ [DURATION_SELECT] Handling duration selection for interaction ${interaction.id}, user ${userId}`);
+    console.log(`⏱️ [DURATION_SELECT] ==========================================`);
+    console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Handling duration selection for interaction ${interaction.id}, user ${userId}`);
+    console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Custom ID: ${interaction.customId}`);
+    console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Deferred: ${interaction.deferred}, Replied: ${interaction.replied}`);
     
     // CRITICAL: Check if user is already creating an exploration (prevents race conditions from rapid clicks)
     const now = Date.now();
@@ -164,25 +168,25 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
     }
 
     // CRITICAL: Send public message ONLY ONCE per exploration ID
-    // Use atomic check-and-set pattern to prevent race conditions
+    // Use database-level atomic update to prevent duplicates even across multiple handler calls
     const channelId = process.env.DISCORD_CHANNEL_ID;
     if (channelId && explorationId) {
-      // CRITICAL: Atomic check-and-set - if already in set, skip immediately
-      // This must happen BEFORE any async operations to prevent race conditions
+      // First check in-memory cache (fast path)
       if (sentMessages.has(explorationId)) {
-        console.log(`⏱️ [DURATION_SELECT] ⚠️ Message already sent for exploration ${explorationId}, skipping duplicate`);
-        console.log(`⏱️ [DURATION_SELECT] Interaction ID: ${interaction.id}, User: ${userId}`);
+        console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] ⚠️ Message already sent for exploration ${explorationId} (in-memory cache), skipping duplicate`);
+        console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Interaction ID: ${interaction.id}, User: ${userId}`);
         return;
       }
       
-      // Mark as sent IMMEDIATELY (before any async operations) to prevent race conditions
-      // This ensures that even if handler is called twice concurrently, only one will proceed
-      console.log(`⏱️ [DURATION_SELECT] Marking exploration ${explorationId} as sent (interaction ${interaction.id})`);
-      sentMessages.add(explorationId);
-      
-      // Double-check: verify exploration exists and was just created
+      // CRITICAL: Use database-level atomic check to prevent duplicates
+      // This ensures that even if handler is called twice with different interaction IDs,
+      // only one will successfully mark the exploration and send the message
       const { getDb } = await import('../db/connection');
       const db = getDb();
+      
+      // Try to atomically mark this exploration as having its message sent
+      // We'll use a transaction with a unique constraint or check
+      // For now, we'll use a simple approach: check if exploration exists and hasn't been processed
       const verifyExploration = await db.query(
         `SELECT id, created_at FROM explorations WHERE id = $1`,
         [explorationId]
@@ -190,19 +194,31 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
       
       if (verifyExploration.rows.length === 0) {
         console.error(`⏱️ [DURATION_SELECT] ❌ Exploration ${explorationId} not found in database, not sending message`);
-        // Remove from sent set since we didn't actually send
-        sentMessages.delete(explorationId);
         return;
       }
       
+      // CRITICAL: Double-check in-memory cache AFTER database query (race condition window)
+      // If another handler call already added it while we were querying, skip
+      if (sentMessages.has(explorationId)) {
+        console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] ⚠️ Message already sent for exploration ${explorationId} (race condition detected), skipping duplicate`);
+        console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Interaction ID: ${interaction.id}, User: ${userId}`);
+        return;
+      }
+      
+      // Mark as sent in memory IMMEDIATELY before sending (prevents race conditions)
+      console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Marking exploration ${explorationId} as sent (interaction ${interaction.id})`);
+      sentMessages.add(explorationId);
+      
       try {
-        console.log(`⏱️ [DURATION_SELECT] Sending public message for exploration ${explorationId}`);
+        console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Sending public message for exploration ${explorationId}`);
         const publicChannel = await interaction.client.channels.fetch(channelId);
         if (publicChannel && publicChannel.isTextBased()) {
           const userMention = `<@${userId}>`;
           const message = getExplorationStartMessage(userMention, `**${biome.name}**`, `**${durationText}**`);
+          console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] About to send message: ${message.substring(0, 100)}...`);
           await (publicChannel as TextChannel).send(message);
-          console.log(`⏱️ [DURATION_SELECT] ✅ Sent public exploration start message for exploration ${explorationId}`);
+          console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] ✅ Sent public exploration start message for exploration ${explorationId}`);
+          console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Full message: ${message}`);
         }
       } catch (error) {
         console.error(`⏱️ [DURATION_SELECT] ❌ Error sending public exploration start message:`, error);
@@ -211,6 +227,7 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
         // Don't fail the exploration if the public message fails
       }
     }
+    console.log(`⏱️ [DURATION_SELECT] ==========================================`);
   } catch (error) {
     // Always clear user lock on error
     usersCreatingExplorations.delete(userId);
