@@ -4,6 +4,7 @@ import * as cron from 'node-cron';
 import { initDatabase, closeDatabase } from './db/connection';
 import { handleExploreCommand } from './commands/explore';
 import { handleWalletSet, handleWalletView, getWalletCommandBuilder } from './commands/wallet';
+import { handleInventoryCommand, getInventoryCommandBuilder } from './commands/inventory';
 import { handleBiomeSelect } from './handlers/biomeSelect';
 import { handleDurationSelect } from './handlers/durationSelect';
 import { checkAndProcessExplorations } from './jobs/checkExplorations';
@@ -46,6 +47,7 @@ client.once(Events.ClientReady, async (readyClient) => {
         .setDescription('Start an exploration expedition in a biome')
         .toJSON(),
       getWalletCommandBuilder().toJSON(),
+      getInventoryCommandBuilder().toJSON(),
     ];
 
     if (guildId) {
@@ -85,6 +87,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
       } else if (subcommand === 'view') {
         await handleWalletView(interaction);
       }
+    } else if (interaction.commandName === 'inventory') {
+      await handleInventoryCommand(interaction);
     }
   } else if (interaction.isButton()) {
     if (interaction.customId.startsWith('biome_')) {
