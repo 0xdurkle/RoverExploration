@@ -97,9 +97,10 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
     // This prevents race conditions at the database level
     console.log(`⏱️ [DURATION_SELECT] Starting exploration for user ${userId}, biome ${biomeId}, duration ${durationHours}h`);
     
+    let exploration: any = null;
     try {
-      await startExploration(userId, biomeId, durationHours);
-      console.log(`⏱️ [DURATION_SELECT] ✅ Exploration started successfully`);
+      exploration = await startExploration(userId, biomeId, durationHours);
+      console.log(`⏱️ [DURATION_SELECT] ✅ Exploration started successfully, ID: ${exploration.id}`);
     } catch (error: any) {
       // If error indicates user already has active exploration, handle gracefully
       if (error.message && error.message.includes('already has an active exploration')) {
@@ -113,6 +114,14 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
       // Re-throw other errors
       throw error;
     }
+
+    // CRITICAL: Only proceed if exploration was actually created
+    if (!exploration || !exploration.id) {
+      console.error(`⏱️ [DURATION_SELECT] ❌ No exploration returned, aborting message sending`);
+      throw new Error('Exploration was not created');
+    }
+    
+    const explorationId = exploration.id;
 
     const multiplier = getDurationMultiplier(durationHours);
     const multiplierText = multiplier > 1 ? ` (${multiplier}x item odds)` : '';
@@ -137,19 +146,46 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
     if (editSuccess) {
       console.log(`⏱️ [DURATION_SELECT] ✅ Successfully updated interaction ${interaction.id}`);
     } else {
-      console.error(`⏱️ [DURATION_SELECT] ⚠️ Failed to update interaction ${interaction.id}, but exploration was started`);
+      console.error(`⏱️ [DURATION_SELECT] ⚠️ Failed to update interaction ${interaction.id}, but exploration ${explorationId} was started`);
     }
 
-    // Send public message to the channel (only once)
+    // CRITICAL: Send public message ONLY ONCE per exploration
+    // Use exploration ID as the source of truth - only send if this specific exploration exists
     const channelId = process.env.DISCORD_CHANNEL_ID;
-    if (channelId && interaction.channel) {
+    if (channelId && explorationId) {
       try {
+        // Verify this specific exploration exists and was just created
+        // This ensures we only send message for the exploration we just created
+        const { getDb } = await import('../db/connection');
+        const db = getDb();
+        const checkExploration = await db.query(
+          `SELECT id, started_at, created_at FROM explorations WHERE id = $1`,
+          [explorationId]
+        );
+        
+        if (checkExploration.rows.length === 0) {
+          console.error(`⏱️ [DURATION_SELECT] ❌ Exploration ${explorationId} not found in database, not sending message`);
+          return;
+        }
+        
+        // Only send if this exploration was created very recently (within last 2 seconds)
+        // This prevents sending message for old explorations if handler is called multiple times
+        const createdTime = new Date(checkExploration.rows[0].created_at).getTime();
+        const now = Date.now();
+        const age = now - createdTime;
+        
+        if (age > 2000) {
+          console.log(`⏱️ [DURATION_SELECT] ⚠️ Exploration ${explorationId} is ${age}ms old, not sending message (likely duplicate handler call)`);
+          return;
+        }
+        
+        console.log(`⏱️ [DURATION_SELECT] Sending public message for exploration ${explorationId} (created ${age}ms ago)`);
         const publicChannel = await interaction.client.channels.fetch(channelId);
         if (publicChannel && publicChannel.isTextBased()) {
           const userMention = `<@${userId}>`;
           const message = getExplorationStartMessage(userMention, `**${biome.name}**`, `**${durationText}**`);
           await (publicChannel as TextChannel).send(message);
-          console.log(`⏱️ [DURATION_SELECT] ✅ Sent public exploration start message`);
+          console.log(`⏱️ [DURATION_SELECT] ✅ Sent public exploration start message for exploration ${explorationId}`);
         }
       } catch (error) {
         console.error(`⏱️ [DURATION_SELECT] ❌ Error sending public exploration start message:`, error);

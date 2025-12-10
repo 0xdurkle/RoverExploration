@@ -1,16 +1,17 @@
-import { createExploration, getActiveExploration, completeExploration } from '../db/models';
+import { createExploration, getActiveExploration, completeExploration, Exploration } from '../db/models';
 import { discoverItem } from './rng';
 import { ItemFound } from '../db/models';
 
 /**
  * Start a new exploration for a user
  * This MUST succeed even if Discord interaction fails
+ * Returns the created exploration
  */
 export async function startExploration(
   userId: string,
   biome: string,
   durationHours: number
-): Promise<void> {
+): Promise<Exploration> {
   try {
     console.log(`🚀 [START_EXPLORATION] Starting exploration for user ${userId}`);
     console.log(`🚀 [START_EXPLORATION] Biome: ${biome}, Duration: ${durationHours} hours`);
@@ -36,6 +37,8 @@ export async function startExploration(
       console.error(`🚀 [START_EXPLORATION] ❌ CRITICAL: Exploration ${exploration.id} not found in database after creation!`);
       throw new Error(`Exploration ${exploration.id} was not saved to database`);
     }
+    
+    return exploration;
   } catch (error) {
     console.error(`🚀 [START_EXPLORATION] ❌ Error starting exploration:`, error);
     console.error(`🚀 [START_EXPLORATION] Error stack:`, error instanceof Error ? error.stack : String(error));
