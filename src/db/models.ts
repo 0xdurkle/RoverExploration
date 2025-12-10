@@ -1,5 +1,5 @@
 import { getDb } from './connection';
-import { HOURS_TO_MILLISECONDS } from '../constants';
+import { HOURS_TO_MILLISECONDS, DURATION_30_SECONDS_HOURS, MIN_KM_PER_HOUR, MAX_KM_PER_HOUR } from '../constants';
 
 export interface Exploration {
   id: number;
@@ -11,6 +11,7 @@ export interface Exploration {
   completed: boolean;
   item_found: ItemFound | null;
   start_message_sent: boolean;
+  distance_km: number | null;
   created_at: Date;
 }
 
@@ -26,6 +27,7 @@ export interface UserProfile {
   total_explorations: number;
   items_found: ItemFound[];
   last_exploration_end: Date | null;
+  total_distance_km: number;
   created_at: Date;
 }
 
@@ -130,11 +132,35 @@ export async function getCompletedExplorations(): Promise<Exploration[]> {
 }
 
 /**
+ * Calculate distance traveled for an exploration
+ * For each hour: 3-10km (RNG per hour)
+ * For 30sec test trips: use 1 hour calculation
+ */
+function calculateDistance(durationHours: number): number {
+  // For 30-second trips, treat as 1 hour
+  const hoursToCalculate = Math.abs(durationHours - DURATION_30_SECONDS_HOURS) < 0.001 
+    ? 1 
+    : Math.ceil(durationHours);
+  
+  let totalDistance = 0;
+  
+  // Calculate distance for each hour (RNG per hour)
+  for (let i = 0; i < hoursToCalculate; i++) {
+    const kmThisHour = MIN_KM_PER_HOUR + Math.random() * (MAX_KM_PER_HOUR - MIN_KM_PER_HOUR);
+    totalDistance += kmThisHour;
+  }
+  
+  // Round to 2 decimal places
+  return Math.round(totalDistance * 100) / 100;
+}
+
+/**
  * Mark exploration as completed and store item found
  */
 export async function completeExploration(
   explorationId: number,
-  itemFound: ItemFound | null
+  itemFound: ItemFound | null,
+  durationHours?: number
 ): Promise<void> {
   const db = getDb();
 
@@ -147,6 +173,16 @@ export async function completeExploration(
       console.log(`🔧 [COMPLETE_EXPLORATION] Item details: name="${itemFound.name}", rarity="${itemFound.rarity}", biome="${itemFound.biome}"`);
     }
     
+    // Get exploration details to calculate distance
+    const explorationResult = await db.query(
+      `SELECT duration_hours FROM explorations WHERE id = $1`,
+      [explorationId]
+    );
+    
+    const explorationDuration = durationHours || explorationResult.rows[0]?.duration_hours || 1;
+    const distanceKm = calculateDistance(explorationDuration);
+    console.log(`🔧 [COMPLETE_EXPLORATION] Calculated distance: ${distanceKm}km for ${explorationDuration} hours`);
+    
     // Use a transaction to ensure atomicity
     console.log(`🔧 [COMPLETE_EXPLORATION] Beginning transaction...`);
     await db.query('BEGIN');
@@ -158,10 +194,10 @@ export async function completeExploration(
       
       const updateResult = await db.query(
         `UPDATE explorations
-         SET completed = TRUE, item_found = $1
-         WHERE id = $2 AND completed = FALSE
+         SET completed = TRUE, item_found = $1, distance_km = $2
+         WHERE id = $3 AND completed = FALSE
          RETURNING user_id, ends_at`,
-        [itemJson, explorationId]
+        [itemJson, distanceKm, explorationId]
       );
       
       console.log(`🔧 [COMPLETE_EXPLORATION] Update query result:`, {
@@ -192,7 +228,7 @@ export async function completeExploration(
       // Then update user profile (this must succeed or we rollback)
       try {
         console.log(`🔧 [COMPLETE_EXPLORATION] Calling updateUserProfile for user ${user_id}...`);
-        await updateUserProfile(user_id, ends_at, itemFound);
+        await updateUserProfile(user_id, ends_at, itemFound, distanceKm);
         console.log(`🔧 [COMPLETE_EXPLORATION] ✅ User profile updated successfully`);
       } catch (profileError) {
         console.error(`🔧 [COMPLETE_EXPLORATION] ❌ Error updating user profile:`, profileError);
@@ -225,7 +261,8 @@ export async function completeExploration(
 async function updateUserProfile(
   userId: string,
   lastExplorationEnd: Date,
-  itemFound: ItemFound | null
+  itemFound: ItemFound | null,
+  distanceKm: number
 ): Promise<void> {
   const db = getDb();
 
@@ -313,14 +350,18 @@ async function updateUserProfile(
       const oldExplorationCount = existing.rows[0].total_explorations;
       console.log(`📋 [UPDATE_USER_PROFILE] Old exploration count: ${oldExplorationCount}, will increment to: ${oldExplorationCount + 1}`);
       
+      const currentDistance = existing.rows[0].total_distance_km || 0;
+      const newDistance = currentDistance + distanceKm;
+      
       const updateResult = await db.query(
         `UPDATE user_profiles
          SET total_explorations = total_explorations + 1,
              items_found = $1::jsonb,
-             last_exploration_end = $2
-         WHERE user_id = $3
-         RETURNING items_found, total_explorations`,
-        [itemsJson, lastExplorationEnd, userId]
+             last_exploration_end = $2,
+             total_distance_km = $3
+         WHERE user_id = $4
+         RETURNING items_found, total_explorations, total_distance_km`,
+        [itemsJson, lastExplorationEnd, newDistance, userId]
       );
       
       console.log(`📋 [UPDATE_USER_PROFILE] Update query executed, rows returned: ${updateResult.rows.length}`);
@@ -400,10 +441,10 @@ async function updateUserProfile(
       console.log(`📋 [UPDATE_USER_PROFILE] JSON to insert:`, itemsJson);
 
       const insertResult = await db.query(
-        `INSERT INTO user_profiles (user_id, total_explorations, items_found, last_exploration_end)
-         VALUES ($1, 1, $2::jsonb, $3)
-         RETURNING items_found, total_explorations`,
-        [userId, itemsJson, lastExplorationEnd]
+        `INSERT INTO user_profiles (user_id, total_explorations, items_found, last_exploration_end, total_distance_km)
+         VALUES ($1, 1, $2::jsonb, $3, $4)
+         RETURNING items_found, total_explorations, total_distance_km`,
+        [userId, itemsJson, lastExplorationEnd, distanceKm]
       );
       
       console.log(`📋 [UPDATE_USER_PROFILE] Insert query executed, rows returned: ${insertResult.rows.length}`);

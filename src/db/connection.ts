@@ -82,6 +82,7 @@ async function createTables(): Promise<void> {
         completed BOOLEAN DEFAULT FALSE,
         item_found JSONB,
         start_message_sent BOOLEAN DEFAULT FALSE,
+        distance_km NUMERIC(10, 2),
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
@@ -99,6 +100,20 @@ async function createTables(): Promise<void> {
         console.log('ℹ️  start_message_sent column check:', error.message);
       }
     }
+    
+    // Add distance_km column if it doesn't exist (migration)
+    try {
+      await pool.query(`
+        ALTER TABLE explorations 
+        ADD COLUMN IF NOT EXISTS distance_km NUMERIC(10, 2)
+      `);
+      console.log('✅ Added distance_km column to explorations table');
+    } catch (error: any) {
+      // Column might already exist - that's fine
+      if (!error.message.includes('already exists') && !error.message.includes('duplicate')) {
+        console.log('ℹ️  distance_km column check:', error.message);
+      }
+    }
 
     // User profiles table
     await pool.query(`
@@ -107,9 +122,24 @@ async function createTables(): Promise<void> {
         total_explorations INTEGER DEFAULT 0,
         items_found JSONB DEFAULT '[]',
         last_exploration_end TIMESTAMP,
+        total_distance_km NUMERIC(10, 2) DEFAULT 0,
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
+    
+    // Add total_distance_km column if it doesn't exist (migration)
+    try {
+      await pool.query(`
+        ALTER TABLE user_profiles 
+        ADD COLUMN IF NOT EXISTS total_distance_km NUMERIC(10, 2) DEFAULT 0
+      `);
+      console.log('✅ Added total_distance_km column to user_profiles table');
+    } catch (error: any) {
+      // Column might already exist - that's fine
+      if (!error.message.includes('already exists') && !error.message.includes('duplicate')) {
+        console.log('ℹ️  total_distance_km column check:', error.message);
+      }
+    }
 
     // Create index for faster queries
     await pool.query(`

@@ -30,6 +30,7 @@ export async function handleInventoryCommand(interaction: ChatInputCommandIntera
     // Get user data
     const itemsFound = profile.items_found || [];
     const totalExplorations = profile.total_explorations;
+    const totalDistanceKm = profile.total_distance_km || 0;
     const currentStreak = await getCurrentStreak(userId);
     const longestStreak = await getLongestStreak(userId);
 
@@ -93,6 +94,7 @@ export async function handleInventoryCommand(interaction: ChatInputCommandIntera
     stats.push(`📘 **Total Explorations:** ${totalExplorations}`);
     stats.push(`🔥 **Current Streak:** ${currentStreak} day${currentStreak !== 1 ? 's' : ''}`);
     stats.push(`🔥 **Longest Streak:** ${longestStreak} day${longestStreak !== 1 ? 's' : ''}`);
+    stats.push(`🚶 **Distance Travelled:** ${totalDistanceKm.toFixed(2)} KM`);
 
     embed.addFields({
       name: '📊 Stats',

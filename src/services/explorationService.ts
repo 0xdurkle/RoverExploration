@@ -142,7 +142,7 @@ export async function finishExploration(
         rarity: itemData.rarity,
         biome: biomeName,
         found_at: itemData.found_at ? new Date(itemData.found_at) : new Date(),
-      });
+      }, durationHours);
       console.log(`🎯 [FINISH_EXPLORATION] ✅ Completed exploration with existing item`);
       console.log(`🎯 [FINISH_EXPLORATION] ==========================================\n`);
       return {
@@ -190,7 +190,7 @@ export async function finishExploration(
 
   // Mark exploration as completed
   console.log(`🎯 [FINISH_EXPLORATION] Calling completeExploration...`);
-  await completeExploration(explorationId, itemFound);
+  await completeExploration(explorationId, itemFound, durationHours);
   console.log(`🎯 [FINISH_EXPLORATION] ✅ completeExploration finished`);
   console.log(`🎯 [FINISH_EXPLORATION] ==========================================\n`);
 
