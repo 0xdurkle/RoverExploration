@@ -158,33 +158,6 @@ export async function completeExploration(
         console.log(`🔧 [COMPLETE_EXPLORATION] Calling updateUserProfile for user ${user_id}...`);
         await updateUserProfile(user_id, ends_at, itemFound);
         console.log(`🔧 [COMPLETE_EXPLORATION] ✅ User profile updated successfully`);
-        
-        // Verify the update actually happened by querying again
-        const verifyUpdate = await db.query(
-          `SELECT total_explorations, items_found FROM user_profiles WHERE user_id = $1`,
-          [user_id]
-        );
-        
-        if (verifyUpdate.rows[0]) {
-          console.log(`🔧 [COMPLETE_EXPLORATION] Verification: Profile has ${verifyUpdate.rows[0].total_explorations} explorations`);
-          if (itemFound) {
-            const items = Array.isArray(verifyUpdate.rows[0].items_found) 
-              ? verifyUpdate.rows[0].items_found 
-              : (verifyUpdate.rows[0].items_found ? JSON.parse(verifyUpdate.rows[0].items_found) : []);
-            const hasItem = items.some((item: any) => 
-              item && item.name === itemFound.name && item.rarity === itemFound.rarity
-            );
-            if (!hasItem) {
-              console.error(`🔧 [COMPLETE_EXPLORATION] ❌ CRITICAL: Item "${itemFound.name}" not found in profile after update!`);
-              console.error(`🔧 [COMPLETE_EXPLORATION] This is a critical error - rolling back transaction`);
-              throw new Error(`Item "${itemFound.name}" was not saved to user profile`);
-            }
-            console.log(`🔧 [COMPLETE_EXPLORATION] ✅ Verified: Item "${itemFound.name}" is in profile`);
-          }
-        } else {
-          console.error(`🔧 [COMPLETE_EXPLORATION] ❌ CRITICAL: Profile not found after update!`);
-          throw new Error(`User profile was not created/updated for user ${user_id}`);
-        }
       } catch (profileError) {
         console.error(`🔧 [COMPLETE_EXPLORATION] ❌ Error updating user profile:`, profileError);
         console.error(`🔧 [COMPLETE_EXPLORATION] Error details:`, profileError instanceof Error ? profileError.stack : String(profileError));
@@ -312,25 +285,28 @@ async function updateUserProfile(
       console.log(`📋 [UPDATE_USER_PROFILE] 💾 Preparing to save: ${itemsFound.length} items, JSON length: ${itemsJson.length}`);
       console.log(`📋 [UPDATE_USER_PROFILE] JSON to save:`, itemsJson.substring(0, 500) + (itemsJson.length > 500 ? '...' : ''));
       
-      const oldExplorationCount = existing.rows[0].total_explorations;
-      console.log(`📋 [UPDATE_USER_PROFILE] Old exploration count: ${oldExplorationCount}, will increment to: ${oldExplorationCount + 1}`);
+      const oldExplorationCount = existing.rows[0].total_explorations || 0;
+      const newExplorationCount = oldExplorationCount + 1;
+      console.log(`📋 [UPDATE_USER_PROFILE] Old exploration count: ${oldExplorationCount}, will increment to: ${newExplorationCount}`);
       
-      // Use a more explicit update to ensure it succeeds
+      // Use INSERT ... ON CONFLICT to ensure it always succeeds (handles both create and update)
       const updateResult = await db.query(
-        `UPDATE user_profiles
-         SET total_explorations = COALESCE(total_explorations, 0) + 1,
-             items_found = $1::jsonb,
-             last_exploration_end = $2
-         WHERE user_id = $3
+        `INSERT INTO user_profiles (user_id, total_explorations, items_found, last_exploration_end)
+         VALUES ($1, $2, $3::jsonb, $4)
+         ON CONFLICT (user_id) 
+         DO UPDATE SET 
+           total_explorations = user_profiles.total_explorations + 1,
+           items_found = $3::jsonb,
+           last_exploration_end = $4
          RETURNING items_found, total_explorations`,
-        [itemsJson, lastExplorationEnd, userId]
+        [userId, newExplorationCount, itemsJson, lastExplorationEnd]
       );
       
-      console.log(`📋 [UPDATE_USER_PROFILE] Update query executed, rows returned: ${updateResult.rows.length}`);
+      console.log(`📋 [UPDATE_USER_PROFILE] Upsert query executed, rows returned: ${updateResult.rows.length}`);
       
       if (updateResult.rows.length === 0) {
-        console.error(`📋 [UPDATE_USER_PROFILE] ❌ Update query returned no rows for user ${userId}`);
-        throw new Error(`Failed to update user profile for user ${userId} - user may not exist`);
+        console.error(`📋 [UPDATE_USER_PROFILE] ❌ Upsert query returned no rows for user ${userId}`);
+        throw new Error(`Failed to upsert user profile for user ${userId}`);
       }
       
       const savedItems = updateResult.rows[0].items_found;
