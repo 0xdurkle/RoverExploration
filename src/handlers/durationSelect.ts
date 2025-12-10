@@ -171,43 +171,35 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
     // Use database-level atomic update to prevent duplicates even across multiple handler calls
     const channelId = process.env.DISCORD_CHANNEL_ID;
     if (channelId && explorationId) {
-      // First check in-memory cache (fast path)
+      // CRITICAL: Atomic check-and-set - must happen BEFORE any async operations
+      // Check if message was already sent
       if (sentMessages.has(explorationId)) {
-        console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] ⚠️ Message already sent for exploration ${explorationId} (in-memory cache), skipping duplicate`);
+        console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] ⚠️ Message already sent for exploration ${explorationId}, skipping duplicate`);
         console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Interaction ID: ${interaction.id}, User: ${userId}`);
+        console.log(`⏱️ [DURATION_SELECT] ==========================================`);
         return;
       }
       
-      // CRITICAL: Use database-level atomic check to prevent duplicates
-      // This ensures that even if handler is called twice with different interaction IDs,
-      // only one will successfully mark the exploration and send the message
+      // CRITICAL: Mark as sent IMMEDIATELY (before any async operations)
+      // This ensures that even if handler is called twice concurrently, only one will proceed
+      console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Marking exploration ${explorationId} as sent (interaction ${interaction.id})`);
+      sentMessages.add(explorationId);
+      
+      // Verify exploration exists (safety check - happens after marking to prevent race conditions)
       const { getDb } = await import('../db/connection');
       const db = getDb();
-      
-      // Try to atomically mark this exploration as having its message sent
-      // We'll use a transaction with a unique constraint or check
-      // For now, we'll use a simple approach: check if exploration exists and hasn't been processed
       const verifyExploration = await db.query(
         `SELECT id, created_at FROM explorations WHERE id = $1`,
         [explorationId]
       );
       
       if (verifyExploration.rows.length === 0) {
-        console.error(`⏱️ [DURATION_SELECT] ❌ Exploration ${explorationId} not found in database, not sending message`);
+        console.error(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] ❌ Exploration ${explorationId} not found in database, not sending message`);
+        // Remove from sent set since we didn't actually send
+        sentMessages.delete(explorationId);
+        console.log(`⏱️ [DURATION_SELECT] ==========================================`);
         return;
       }
-      
-      // CRITICAL: Double-check in-memory cache AFTER database query (race condition window)
-      // If another handler call already added it while we were querying, skip
-      if (sentMessages.has(explorationId)) {
-        console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] ⚠️ Message already sent for exploration ${explorationId} (race condition detected), skipping duplicate`);
-        console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Interaction ID: ${interaction.id}, User: ${userId}`);
-        return;
-      }
-      
-      // Mark as sent in memory IMMEDIATELY before sending (prevents race conditions)
-      console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Marking exploration ${explorationId} as sent (interaction ${interaction.id})`);
-      sentMessages.add(explorationId);
       
       try {
         console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Sending public message for exploration ${explorationId}`);
