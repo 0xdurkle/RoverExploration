@@ -155,21 +155,6 @@ export async function completeExploration(
       });
       throw error;
     }
-
-    // Update user profile
-    const exploration = await db.query(
-      `SELECT user_id, ends_at FROM explorations WHERE id = $1`,
-      [explorationId]
-    );
-
-    if (exploration.rows[0]) {
-      const { user_id, ends_at } = exploration.rows[0];
-      console.log(`   📝 Updating profile for user ${user_id} with item:`, itemFound ? `${itemFound.name} (${itemFound.rarity})` : 'none');
-      await updateUserProfile(user_id, ends_at, itemFound);
-      console.log(`   ✅ Successfully updated profile for user ${user_id}`);
-    } else {
-      console.error(`   ❌ No exploration found with id ${explorationId}`);
-    }
   } catch (error) {
     console.error(`   ❌ Error in completeExploration for ${explorationId}:`, error);
     throw error;
