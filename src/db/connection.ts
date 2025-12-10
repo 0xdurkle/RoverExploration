@@ -81,9 +81,24 @@ async function createTables(): Promise<void> {
         ends_at TIMESTAMP NOT NULL,
         completed BOOLEAN DEFAULT FALSE,
         item_found JSONB,
+        start_message_sent BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
+    
+    // Add start_message_sent column if it doesn't exist (migration)
+    try {
+      await pool.query(`
+        ALTER TABLE explorations 
+        ADD COLUMN IF NOT EXISTS start_message_sent BOOLEAN DEFAULT FALSE
+      `);
+      console.log('✅ Added start_message_sent column to explorations table');
+    } catch (error: any) {
+      // Column might already exist - that's fine
+      if (!error.message.includes('already exists') && !error.message.includes('duplicate')) {
+        console.log('ℹ️  start_message_sent column check:', error.message);
+      }
+    }
 
     // User profiles table
     await pool.query(`

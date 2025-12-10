@@ -10,6 +10,7 @@ export interface Exploration {
   ends_at: Date;
   completed: boolean;
   item_found: ItemFound | null;
+  start_message_sent: boolean;
   created_at: Date;
 }
 
@@ -72,8 +73,8 @@ export async function createExploration(
       
       // Now insert the new exploration (we have the lock, so no race condition)
       const result = await db.query(
-        `INSERT INTO explorations (user_id, biome, duration_hours, started_at, ends_at)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO explorations (user_id, biome, duration_hours, started_at, ends_at, start_message_sent)
+         VALUES ($1, $2, $3, $4, $5, FALSE)
          RETURNING *`,
         [userId, biome, durationHours, startedAt, endsAt]
       );
@@ -555,6 +556,36 @@ export async function getUserWalletByAddress(walletAddress: string): Promise<Use
   );
 
   return result.rows[0] || null;
+}
+
+/**
+ * Atomically mark an exploration's start message as sent
+ * Returns true if the update succeeded (message wasn't already sent)
+ * Returns false if message was already sent (prevents duplicates)
+ * This uses an atomic database UPDATE to prevent race conditions
+ */
+export async function markStartMessageSent(explorationId: number): Promise<boolean> {
+  const db = getDb();
+  
+  try {
+    // Atomic UPDATE: only update if start_message_sent is FALSE
+    // This ensures only one handler call can successfully mark it as sent
+    const result = await db.query(
+      `UPDATE explorations 
+       SET start_message_sent = TRUE 
+       WHERE id = $1 AND start_message_sent = FALSE
+       RETURNING id`,
+      [explorationId]
+    );
+    
+    // If we updated a row, message wasn't sent yet - return true
+    // If no rows updated, message was already sent - return false
+    return result.rows.length > 0;
+  } catch (error) {
+    console.error(`❌ [MARK_START_MESSAGE_SENT] Error marking message as sent for exploration ${explorationId}:`, error);
+    // On error, assume it was already sent to prevent duplicates
+    return false;
+  }
 }
 
 /**
