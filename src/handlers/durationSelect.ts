@@ -10,11 +10,22 @@ import { safeDeferUpdate, safeEditReply, safeFollowUp } from '../utils/interacti
 // This prevents duplicate messages even if handler is called multiple times
 const sentMessages = new Set<number>();
 
+// Track users currently creating explorations to prevent race conditions
+// Key: user ID, Value: timestamp when they started creating
+const usersCreatingExplorations = new Map<string, number>();
+
 // Clean up old sent message tracking periodically
 setInterval(() => {
   if (sentMessages.size > 100) {
     sentMessages.clear();
     console.log(`🧹 [DURATION_SELECT] Cleared sent messages cache`);
+  }
+  // Clean up old user locks (older than 5 seconds)
+  const now = Date.now();
+  for (const [userId, timestamp] of usersCreatingExplorations.entries()) {
+    if (now - timestamp > 5000) {
+      usersCreatingExplorations.delete(userId);
+    }
   }
 }, 60000); // Every minute
 
@@ -27,6 +38,26 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
   
   try {
     console.log(`⏱️ [DURATION_SELECT] Handling duration selection for interaction ${interaction.id}, user ${userId}`);
+    
+    // CRITICAL: Check if user is already creating an exploration (prevents race conditions from rapid clicks)
+    const now = Date.now();
+    const userLockTime = usersCreatingExplorations.get(userId);
+    if (userLockTime && (now - userLockTime) < 5000) {
+      console.log(`⏱️ [DURATION_SELECT] ⚠️ User ${userId} is already creating an exploration (${now - userLockTime}ms ago), ignoring duplicate`);
+      try {
+        await safeDeferUpdate(interaction);
+        await safeEditReply(interaction, {
+          content: '⚠️ An exploration is already being started. Please wait a moment.',
+          components: [],
+        });
+      } catch (error) {
+        // Ignore errors if interaction expired
+      }
+      return;
+    }
+    
+    // Mark user as creating exploration
+    usersCreatingExplorations.set(userId, now);
     
     // Safely defer the update IMMEDIATELY
     const deferred = await safeDeferUpdate(interaction);
@@ -49,6 +80,7 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
     const biome = getBiome(biomeId);
     if (!biome) {
       console.error(`⏱️ [DURATION_SELECT] Invalid biome ID: ${biomeId}`);
+      usersCreatingExplorations.delete(userId); // Clear lock on error
       await safeFollowUp(interaction, {
         content: '❌ Invalid biome selected.',
         ephemeral: true,
@@ -61,6 +93,7 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
     const remaining = await getCooldownRemaining(userId);
     if (remaining && remaining > 0) {
       console.log(`⏱️ [DURATION_SELECT] User ${userId} has active cooldown: ${remaining}ms`);
+      usersCreatingExplorations.delete(userId); // Clear lock on early return
       await safeEditReply(interaction, {
         content: '⚠️ You already have an active exploration. Please wait for it to complete.',
         components: [],
@@ -77,6 +110,9 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
       exploration = await startExploration(userId, biomeId, durationHours);
       console.log(`⏱️ [DURATION_SELECT] ✅ Exploration started successfully, ID: ${exploration.id}`);
     } catch (error: any) {
+      // Clear user lock on error
+      usersCreatingExplorations.delete(userId);
+      
       // If error indicates user already has active exploration, handle gracefully
       if (error.message && error.message.includes('already has an active exploration')) {
         console.log(`⏱️ [DURATION_SELECT] ⚠️ User ${userId} already has active exploration, preventing duplicate`);
@@ -89,6 +125,9 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
       // Re-throw other errors
       throw error;
     }
+    
+    // Clear user lock after successful exploration creation
+    usersCreatingExplorations.delete(userId);
 
     // CRITICAL: Only proceed if exploration was actually created
     if (!exploration || !exploration.id) {
@@ -167,6 +206,9 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
       }
     }
   } catch (error) {
+    // Always clear user lock on error
+    usersCreatingExplorations.delete(userId);
+    
     console.error(`⏱️ [DURATION_SELECT] ❌ Error starting exploration:`, error);
     console.error(`⏱️ [DURATION_SELECT] Error stack:`, error instanceof Error ? error.stack : String(error));
     

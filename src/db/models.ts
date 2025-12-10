@@ -54,12 +54,13 @@ export async function createExploration(
     await db.query('BEGIN');
     
     try {
-      // First, check for existing active exploration and lock it
-      // This prevents concurrent requests from both creating explorations
+      // First, check for existing active exploration and lock ALL rows for this user
+      // Use FOR UPDATE to wait for any concurrent transactions to complete
+      // This ensures we see the most up-to-date state
       const existingResult = await db.query(
         `SELECT id FROM explorations 
          WHERE user_id = $1 AND ends_at > $2 AND completed = FALSE 
-         FOR UPDATE NOWAIT`,
+         FOR UPDATE`,
         [userId, startedAt]
       );
       
