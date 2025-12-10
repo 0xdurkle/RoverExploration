@@ -8,7 +8,7 @@ import { safeDeferUpdate, safeEditReply, safeFollowUp } from '../utils/interacti
 
 // Track processing interactions to prevent duplicates
 const processingInteractions = new Set<string>();
-const processingUsers = new Set<string>();
+const processingUsers = new Map<string, number>(); // Map user ID to timestamp
 
 /**
  * Handle duration selection button click
@@ -22,8 +22,12 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
 
   // Prevent duplicate processing for the same user (race condition protection)
   const userId = interaction.user.id;
-  if (processingUsers.has(userId)) {
-    console.log(`⏱️ [DURATION_SELECT] User ${userId} already has an exploration being started, ignoring duplicate`);
+  const now = Date.now();
+  const userProcessingTime = processingUsers.get(userId);
+  
+  // Check if user is currently processing (within last 5 seconds)
+  if (userProcessingTime && (now - userProcessingTime) < 5000) {
+    console.log(`⏱️ [DURATION_SELECT] User ${userId} already has an exploration being started (${now - userProcessingTime}ms ago), ignoring duplicate`);
     try {
       await safeDeferUpdate(interaction);
       await safeEditReply(interaction, {
@@ -39,7 +43,7 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
   try {
     // Mark as processing
     processingInteractions.add(interaction.id);
-    processingUsers.add(userId);
+    processingUsers.set(userId, Date.now());
     
     console.log(`⏱️ [DURATION_SELECT] Handling duration selection for interaction ${interaction.id}, user ${userId}`);
     
@@ -83,13 +87,49 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
       return;
     }
 
+    // CRITICAL: Final check right before creating exploration to prevent race conditions
+    // Check database directly for any active exploration
+    const { getDb } = await import('../db/connection');
+    const { getActiveExploration } = await import('../db/models');
+    const db = getDb();
+    const now = new Date();
+    
+    // Check if user has any active exploration in database
+    const activeCheck = await db.query(
+      `SELECT id FROM explorations 
+       WHERE user_id = $1 AND ends_at > $2 AND completed = FALSE 
+       LIMIT 1`,
+      [userId, now]
+    );
+    
+    if (activeCheck.rows.length > 0) {
+      console.log(`⏱️ [DURATION_SELECT] ⚠️ User ${userId} already has active exploration ${activeCheck.rows[0].id} in database, preventing duplicate`);
+      await safeEditReply(interaction, {
+        content: '⚠️ You already have an active exploration. Please wait for it to complete.',
+        components: [],
+      });
+      return;
+    }
+
     // Start exploration
     console.log(`⏱️ [DURATION_SELECT] Starting exploration for user ${userId}, biome ${biomeId}, duration ${durationHours}h`);
     await startExploration(userId, biomeId, durationHours);
     console.log(`⏱️ [DURATION_SELECT] ✅ Exploration started successfully`);
     
-    // Mark user as having active exploration to prevent duplicates
-    // This will be cleared when exploration completes
+    // CRITICAL: Verify only ONE exploration was created
+    const verifyCheck = await db.query(
+      `SELECT id FROM explorations 
+       WHERE user_id = $1 AND ends_at > $2 AND completed = FALSE 
+       ORDER BY created_at DESC`,
+      [userId, now]
+    );
+    
+    if (verifyCheck.rows.length > 1) {
+      console.error(`⏱️ [DURATION_SELECT] ❌ CRITICAL: User ${userId} has ${verifyCheck.rows.length} active explorations! This should not happen.`);
+      console.error(`⏱️ [DURATION_SELECT] Active exploration IDs:`, verifyCheck.rows.map((r: any) => r.id));
+    } else {
+      console.log(`⏱️ [DURATION_SELECT] ✅ Verified: User ${userId} has exactly ${verifyCheck.rows.length} active exploration(s)`);
+    }
 
     const multiplier = getDurationMultiplier(durationHours);
     const multiplierText = multiplier > 1 ? ` (${multiplier}x item odds)` : '';
@@ -153,10 +193,11 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
   } finally {
     // Always clear processing flags
     processingInteractions.delete(interaction.id);
-    // Clear user processing flag after a short delay to allow for immediate retry prevention
+    // Clear user processing flag after a delay to prevent race conditions
+    // Keep it longer (5 seconds) to catch interactions that come in slightly delayed
     setTimeout(() => {
       processingUsers.delete(userId);
       console.log(`⏱️ [DURATION_SELECT] Cleared processing flag for user ${userId}`);
-    }, 2000); // 2 second cooldown to prevent rapid double-clicks
+    }, 5000); // 5 second cooldown to prevent race conditions from delayed interactions
   }
 }
