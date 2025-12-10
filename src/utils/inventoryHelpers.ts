@@ -115,25 +115,37 @@ export function buildItemCounts(itemsFound: ItemFound[]): ItemCount[] {
       const rarity = storedRarities.get(itemName);
       const biome = storedBiomes.get(itemName);
       
-      if (rarity && biome) {
-        itemCounts.push({
-          name: itemName,
-          count,
-          rarity: rarity,
-          biome: biome,
-          emoji: getRarityEmoji(rarity as 'uncommon' | 'rare' | 'legendary'),
-        });
-        processedItemNames.add(itemName);
-      } else {
-        console.error(`❌ buildItemCounts: Missing rarity/biome for item "${itemName}"`);
-      }
+      // Try to find the item in biome data to get display name if biome is an ID
+      const allItems = getAllItems();
+      const biomeItem = allItems.find(item => item.name === itemName);
+      
+      // Use stored rarity if available, otherwise try biome data, default to 'uncommon'
+      const finalRarity = rarity || biomeItem?.rarity || 'uncommon';
+      // Use stored biome if available, otherwise try biome data, otherwise use stored or 'Unknown'
+      const finalBiome = biome || biomeItem?.biome || 'Unknown';
+      
+      // Validate rarity is valid
+      const validRarities = ['uncommon', 'rare', 'legendary'];
+      const safeRarity = validRarities.includes(finalRarity) ? finalRarity : 'uncommon';
+      
+      console.log(`   Processing user item: ${itemName} - count: ${count}, rarity: ${safeRarity}, biome: ${finalBiome}`);
+      
+      itemCounts.push({
+        name: itemName,
+        count,
+        rarity: safeRarity,
+        biome: finalBiome,
+        emoji: getRarityEmoji(safeRarity as 'uncommon' | 'rare' | 'legendary'),
+      });
+      processedItemNames.add(itemName);
     }
   });
 
   // THEN: Add biome items that user hasn't found yet (for 0 counts)
   // This allows showing all available items
-  const allItems = getAllItems();
-  allItems.forEach((item) => {
+  // (Note: getAllItems was already called above, but we call it again here for clarity)
+  const allItemsForDisplay = getAllItems();
+  allItemsForDisplay.forEach((item) => {
     if (!processedItemNames.has(item.name)) {
       itemCounts.push({
         name: item.name,
