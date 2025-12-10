@@ -1,6 +1,7 @@
 import { ChatInputCommandInteraction, SlashCommandBuilder } from 'discord.js';
 import { getDb } from '../db/connection';
 import { ItemFound } from '../db/models';
+import { getBiome } from '../services/rng';
 
 /**
  * Repair command to recover missing items from explorations table
@@ -76,7 +77,6 @@ export async function handleRepairCommand(interaction: ChatInputCommandInteracti
             let biomeName = itemData.biome || exp.biome;
             if (biomeName.includes('_')) {
               // Likely a biome ID, convert to name
-              const { getBiome } = await import('../services/rng');
               const biomeData = getBiome(biomeName);
               biomeName = biomeData?.name || biomeName;
             }
