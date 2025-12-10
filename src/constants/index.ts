@@ -28,7 +28,3 @@ export const TEST_PROBABILITIES = {
   legendary: 0.05, // 5%
 };
 
-// Distance calculation constants
-export const MIN_KM_PER_HOUR = 3;
-export const MAX_KM_PER_HOUR = 10;
-

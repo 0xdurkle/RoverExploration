@@ -284,7 +284,7 @@ async function completePartyExpedition(client: Client, partyId: string): Promise
     // Mark all party explorations as completed with the same item
     for (const explorationId of explorationIds) {
       try {
-        await completeExploration(explorationId, itemFound, party.durationHours);
+        await completeExploration(explorationId, itemFound);
       } catch (error) {
         console.error(`Error completing exploration ${explorationId} for party ${partyId}:`, error);
       }

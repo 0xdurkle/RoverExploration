@@ -166,10 +166,6 @@ async function processExploration(exploration: Exploration, channel: TextChannel
     const user = await channel.client.users.fetch(exploration.user_id);
     const userMention = user ? `<@${exploration.user_id}>` : `User ${exploration.user_id}`;
 
-    // Get distance from exploration (handle null/undefined)
-    const distanceKm = exploration.distance_km ?? null;
-    console.log(`🔄 [PROCESS_EXPLORATION] Distance traveled: ${distanceKm ?? 'N/A'}km`);
-
     // Post result message (only after verification)
     if (itemFound) {
       console.log(`🔄 [PROCESS_EXPLORATION] Sending Discord message for item...`);
@@ -179,14 +175,13 @@ async function processExploration(exploration: Exploration, channel: TextChannel
         userMention,
         `**${biomeName}**`,
         `**${itemFound.name}**`,
-        itemFound.rarity,
-        distanceKm
+        itemFound.rarity
       );
       await channel.send(message);
       console.log(`🔄 [PROCESS_EXPLORATION] ✅ Sent Discord message for item: ${itemFound.name} (${itemFound.rarity})`);
     } else {
       console.log(`🔄 [PROCESS_EXPLORATION] Sending Discord message: no item found...`);
-      const message = getReturnEmptyMessage(userMention, `**${biomeName}**`, distanceKm);
+      const message = getReturnEmptyMessage(userMention, `**${biomeName}**`);
       await channel.send(message);
       console.log(`🔄 [PROCESS_EXPLORATION] ✅ Sent Discord message: no item found`);
     }
