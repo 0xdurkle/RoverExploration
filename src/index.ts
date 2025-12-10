@@ -83,8 +83,17 @@ client.once(Events.ClientReady, async (readyClient) => {
   console.log('✅ Exploration checker started (checking every 10 seconds)');
 });
 
-// Handle slash commands
+// Handle slash commands and button interactions
 client.on(Events.InteractionCreate, async (interaction) => {
+  // Add error handling wrapper
+  try {
+    // Log all interactions for debugging
+    if (interaction.isButton()) {
+      console.log(`🔘 [INTERACTION] Button interaction: ${interaction.customId}, User: ${interaction.user.id}, Deferred: ${interaction.deferred}, Replied: ${interaction.replied}`);
+    } else if (interaction.isChatInputCommand()) {
+      console.log(`💬 [INTERACTION] Command: ${interaction.commandName}, User: ${interaction.user.id}`);
+    }
+
   if (interaction.isChatInputCommand()) {
     if (interaction.commandName === 'explore') {
       await handleExploreCommand(interaction);
@@ -117,6 +126,22 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await handleDurationSelect(interaction);
     } else if (interaction.customId.startsWith('party_join_')) {
       await handlePartyJoin(interaction);
+    }
+  }
+  } catch (error) {
+    console.error(`❌ [INTERACTION] Unhandled error in interaction handler:`, error);
+    console.error(`❌ [INTERACTION] Error stack:`, error instanceof Error ? error.stack : String(error));
+    
+    // Try to respond to the interaction if it's still valid
+    try {
+      if (interaction.isButton() && !interaction.replied && !interaction.deferred) {
+        await interaction.deferUpdate().catch(() => {});
+      } else if (interaction.isChatInputCommand() && !interaction.replied && !interaction.deferred) {
+        await interaction.deferReply({ ephemeral: true }).catch(() => {});
+        await interaction.editReply({ content: '❌ An error occurred. Please try again.' }).catch(() => {});
+      }
+    } catch (responseError) {
+      console.error(`❌ [INTERACTION] Failed to send error response:`, responseError);
     }
   }
 });
