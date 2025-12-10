@@ -173,7 +173,7 @@ export async function completeExploration(
         // Exploration was already completed, check what's in there
         console.log(`🔧 [COMPLETE_EXPLORATION] No rows updated, checking if already completed...`);
         const existing = await db.query(
-          `SELECT item_found, completed, distance_km FROM explorations WHERE id = $1`,
+          `SELECT item_found, completed FROM explorations WHERE id = $1`,
           [explorationId]
         );
         console.log(`🔧 [COMPLETE_EXPLORATION] Existing exploration data:`, existing.rows[0]);
