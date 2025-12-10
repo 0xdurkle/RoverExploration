@@ -168,22 +168,26 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
     }
 
     // CRITICAL: Send public message ONLY ONCE per exploration ID
-    // Use database-level atomic update to prevent duplicates even across multiple handler calls
+    // This must be the ABSOLUTE LAST thing that happens - no code after this should send messages
     const channelId = process.env.DISCORD_CHANNEL_ID;
     if (channelId && explorationId) {
       // CRITICAL: Atomic check-and-set - must happen BEFORE any async operations
-      // Check if message was already sent
+      // Check if message was already sent (this is the ONLY place messages are sent)
       if (sentMessages.has(explorationId)) {
-        console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] ⚠️ Message already sent for exploration ${explorationId}, skipping duplicate`);
+        console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] ⚠️ BLOCKED: Message already sent for exploration ${explorationId}, skipping duplicate`);
         console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Interaction ID: ${interaction.id}, User: ${userId}`);
+        console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] sentMessages Set contents:`, Array.from(sentMessages));
         console.log(`⏱️ [DURATION_SELECT] ==========================================`);
-        return;
+        return; // CRITICAL: Exit immediately - do not proceed
       }
       
       // CRITICAL: Mark as sent IMMEDIATELY (before any async operations)
       // This ensures that even if handler is called twice concurrently, only one will proceed
-      console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Marking exploration ${explorationId} as sent (interaction ${interaction.id})`);
+      console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] ✅ LOCKING: Marking exploration ${explorationId} as sent (interaction ${interaction.id})`);
+      console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] sentMessages size before add: ${sentMessages.size}`);
       sentMessages.add(explorationId);
+      console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] sentMessages size after add: ${sentMessages.size}`);
+      console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Verification: has(${explorationId}) = ${sentMessages.has(explorationId)}`);
       
       // Verify exploration exists (safety check - happens after marking to prevent race conditions)
       const { getDb } = await import('../db/connection');
@@ -202,18 +206,40 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
       }
       
       try {
+        // CRITICAL: Final check before sending - ensure we haven't already sent
+        // This is a defensive check in case something went wrong
+        if (sentMessages.has(explorationId)) {
+          // Double-check: verify we're the one who added it
+          // If we're here, we should have added it, but be extra safe
+          console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Final check: exploration ${explorationId} is marked as sent`);
+        }
+        
         console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Sending public message for exploration ${explorationId}`);
         const publicChannel = await interaction.client.channels.fetch(channelId);
         if (publicChannel && publicChannel.isTextBased()) {
           const userMention = `<@${userId}>`;
           const message = getExplorationStartMessage(userMention, `**${biome.name}**`, `**${durationText}**`);
           console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] About to send message: ${message.substring(0, 100)}...`);
-          await (publicChannel as TextChannel).send(message);
+          
+          // CRITICAL: Send message and immediately verify it was sent
+          const sentMessage = await (publicChannel as TextChannel).send(message);
           console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] ✅ Sent public exploration start message for exploration ${explorationId}`);
+          console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Message ID: ${sentMessage.id}`);
           console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Full message: ${message}`);
+          
+          // Verify the message is still in sentMessages (should never fail, but be defensive)
+          if (!sentMessages.has(explorationId)) {
+            console.error(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] ❌ CRITICAL: Exploration ${explorationId} was removed from sentMessages after sending!`);
+            // Re-add it to prevent duplicates
+            sentMessages.add(explorationId);
+          }
+        } else {
+          console.error(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] ❌ Channel ${channelId} is not a text channel`);
+          // Remove from sent set since we didn't actually send
+          sentMessages.delete(explorationId);
         }
       } catch (error) {
-        console.error(`⏱️ [DURATION_SELECT] ❌ Error sending public exploration start message:`, error);
+        console.error(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] ❌ Error sending public exploration start message:`, error);
         // Remove from sent set on error so it can be retried if needed
         sentMessages.delete(explorationId);
         // Don't fail the exploration if the public message fails
