@@ -4,13 +4,43 @@ import { ItemFound } from '../db/models';
 
 /**
  * Start a new exploration for a user
+ * This MUST succeed even if Discord interaction fails
  */
 export async function startExploration(
   userId: string,
   biome: string,
   durationHours: number
 ): Promise<void> {
-  await createExploration(userId, biome, durationHours);
+  try {
+    console.log(`🚀 [START_EXPLORATION] Starting exploration for user ${userId}`);
+    console.log(`🚀 [START_EXPLORATION] Biome: ${biome}, Duration: ${durationHours} hours`);
+    
+    const exploration = await createExploration(userId, biome, durationHours);
+    
+    console.log(`🚀 [START_EXPLORATION] ✅ Exploration created successfully`);
+    console.log(`🚀 [START_EXPLORATION] Exploration ID: ${exploration.id}`);
+    console.log(`🚀 [START_EXPLORATION] Ends at: ${exploration.ends_at}`);
+    
+    // Verify it was saved
+    const { getDb } = await import('../db/connection');
+    const db = getDb();
+    const verify = await db.query(
+      `SELECT id, completed, ends_at FROM explorations WHERE id = $1`,
+      [exploration.id]
+    );
+    
+    if (verify.rows[0]) {
+      console.log(`🚀 [START_EXPLORATION] ✅ Verified exploration ${exploration.id} in database`);
+      console.log(`🚀 [START_EXPLORATION] Completed: ${verify.rows[0].completed}, Ends at: ${verify.rows[0].ends_at}`);
+    } else {
+      console.error(`🚀 [START_EXPLORATION] ❌ CRITICAL: Exploration ${exploration.id} not found in database after creation!`);
+      throw new Error(`Exploration ${exploration.id} was not saved to database`);
+    }
+  } catch (error) {
+    console.error(`🚀 [START_EXPLORATION] ❌ Error starting exploration:`, error);
+    console.error(`🚀 [START_EXPLORATION] Error stack:`, error instanceof Error ? error.stack : String(error));
+    throw error; // Re-throw to let caller handle it
+  }
 }
 
 /**
