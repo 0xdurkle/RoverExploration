@@ -525,20 +525,25 @@ export async function getUserWalletByAddress(walletAddress: string): Promise<Use
 /**
  * End all active explorations (mark as completed)
  * This is useful for resetting the system or clearing stuck explorations
+ * Finds all explorations that are not completed, regardless of whether they've passed their end time
  */
 export async function endAllExplorations(): Promise<{ count: number; explorations: Exploration[] }> {
   const db = getDb();
+  const now = new Date();
 
   try {
     console.log(`\n🛑 [END_ALL_EXPLORATIONS] ==========================================`);
     console.log(`🛑 [END_ALL_EXPLORATIONS] Starting to end all active explorations...`);
+    console.log(`🛑 [END_ALL_EXPLORATIONS] Current time: ${now.toISOString()}`);
     
-    // First, get all incomplete explorations
+    // First, get all incomplete explorations (both active and past-due)
     const getIncomplete = await db.query(
-      `SELECT * FROM explorations WHERE completed = FALSE ORDER BY id ASC`
+      `SELECT * FROM explorations 
+       WHERE completed = FALSE 
+       ORDER BY id ASC`
     );
     
-    console.log(`🛑 [END_ALL_EXPLORATIONS] Found ${getIncomplete.rows.length} incomplete explorations`);
+    console.log(`🛑 [END_ALL_EXPLORATIONS] Found ${getIncomplete.rows.length} incomplete explorations in database`);
     
     if (getIncomplete.rows.length === 0) {
       console.log(`🛑 [END_ALL_EXPLORATIONS] No incomplete explorations to end`);
@@ -546,12 +551,25 @@ export async function endAllExplorations(): Promise<{ count: number; exploration
       return { count: 0, explorations: [] };
     }
 
-    // Log details of each exploration
-    getIncomplete.rows.forEach((exp, idx) => {
-      console.log(`🛑 [END_ALL_EXPLORATIONS] Exploration ${idx + 1}: ID=${exp.id}, User=${exp.user_id}, Biome=${exp.biome}, EndsAt=${exp.ends_at}, HasItem=${!!exp.item_found}`);
+    // Separate active (ends_at > now) from past-due (ends_at <= now)
+    const activeExplorations: Exploration[] = [];
+    const pastDueExplorations: Exploration[] = [];
+    
+    getIncomplete.rows.forEach((exp) => {
+      const endsAt = new Date(exp.ends_at);
+      if (endsAt > now) {
+        activeExplorations.push(exp);
+        console.log(`🛑 [END_ALL_EXPLORATIONS] Active: ID=${exp.id}, User=${exp.user_id}, Biome=${exp.biome}, EndsAt=${endsAt.toISOString()}`);
+      } else {
+        pastDueExplorations.push(exp);
+        console.log(`🛑 [END_ALL_EXPLORATIONS] Past-due: ID=${exp.id}, User=${exp.user_id}, Biome=${exp.biome}, EndsAt=${endsAt.toISOString()}`);
+      }
     });
 
-    // Mark all as completed
+    console.log(`🛑 [END_ALL_EXPLORATIONS] Active explorations: ${activeExplorations.length}`);
+    console.log(`🛑 [END_ALL_EXPLORATIONS] Past-due explorations: ${pastDueExplorations.length}`);
+
+    // Mark all incomplete explorations as completed
     // If they don't have an item_found, set it to NULL
     const updateResult = await db.query(
       `UPDATE explorations 
