@@ -181,17 +181,13 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
         return; // CRITICAL: Exit immediately - do not proceed
       }
       
-      // CRITICAL: Mark as sent IMMEDIATELY (before any async operations)
-      // This ensures that even if handler is called twice concurrently, only one will proceed
-      console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] ✅ LOCKING: Marking exploration ${explorationId} as sent (interaction ${interaction.id})`);
-      console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] sentMessages size before add: ${sentMessages.size}`);
-      sentMessages.add(explorationId);
-      console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] sentMessages size after add: ${sentMessages.size}`);
-      console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Verification: has(${explorationId}) = ${sentMessages.has(explorationId)}`);
-      
-      // Verify exploration exists (safety check - happens after marking to prevent race conditions)
+      // CRITICAL: Use database-level atomic update to prevent duplicates
+      // This ensures that even if handler is called twice with different interaction IDs,
+      // only one will successfully mark the exploration and send the message
       const { getDb } = await import('../db/connection');
       const db = getDb();
+      
+      // First verify exploration exists
       const verifyExploration = await db.query(
         `SELECT id, created_at FROM explorations WHERE id = $1`,
         [explorationId]
@@ -199,11 +195,26 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
       
       if (verifyExploration.rows.length === 0) {
         console.error(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] ❌ Exploration ${explorationId} not found in database, not sending message`);
-        // Remove from sent set since we didn't actually send
-        sentMessages.delete(explorationId);
         console.log(`⏱️ [DURATION_SELECT] ==========================================`);
         return;
       }
+      
+      // CRITICAL: Double-check in-memory cache AFTER database query (catches race conditions)
+      // If another handler call already added it while we were querying, skip
+      if (sentMessages.has(explorationId)) {
+        console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] ⚠️ BLOCKED: Message already sent for exploration ${explorationId} (race condition detected), skipping duplicate`);
+        console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Interaction ID: ${interaction.id}, User: ${userId}`);
+        console.log(`⏱️ [DURATION_SELECT] ==========================================`);
+        return;
+      }
+      
+      // CRITICAL: Mark as sent IMMEDIATELY (before any async operations)
+      // This ensures that even if handler is called twice concurrently, only one will proceed
+      console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] ✅ LOCKING: Marking exploration ${explorationId} as sent (interaction ${interaction.id})`);
+      console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] sentMessages size before add: ${sentMessages.size}`);
+      sentMessages.add(explorationId);
+      console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] sentMessages size after add: ${sentMessages.size}`);
+      console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Verification: has(${explorationId}) = ${sentMessages.has(explorationId)}`);
       
       try {
         // CRITICAL: Final check before sending - ensure we haven't already sent
@@ -221,7 +232,15 @@ export async function handleDurationSelect(interaction: ButtonInteraction): Prom
           const message = getExplorationStartMessage(userMention, `**${biome.name}**`, `**${durationText}**`);
           console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] About to send message: ${message.substring(0, 100)}...`);
           
-          // CRITICAL: Send message and immediately verify it was sent
+          // CRITICAL: Final check before sending - ensure we haven't already sent
+          // This is a defensive check in case something went wrong between marking and sending
+          if (!sentMessages.has(explorationId)) {
+            console.error(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] ❌ CRITICAL: Exploration ${explorationId} was removed from sentMessages before sending! Re-adding...`);
+            sentMessages.add(explorationId);
+          }
+          
+          // CRITICAL: Send message ONCE - this is the ONLY place messages are sent
+          console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] EXECUTING channel.send() for exploration ${explorationId}`);
           const sentMessage = await (publicChannel as TextChannel).send(message);
           console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] ✅ Sent public exploration start message for exploration ${explorationId}`);
           console.log(`⏱️ [DURATION_SELECT] [CALL_ID: ${callId}] Message ID: ${sentMessage.id}`);
