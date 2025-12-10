@@ -8,6 +8,7 @@ import {
 } from '../utils/inventoryHelpers';
 import { getRarityColor } from '../utils/rarityColors';
 import { generateProgressBar, calculatePercentage } from '../utils/progressBar';
+import { RARITY_ORDER } from '../constants';
 
 /**
  * Handle /inventory command
