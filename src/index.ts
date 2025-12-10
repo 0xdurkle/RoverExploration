@@ -5,8 +5,10 @@ import { initDatabase, closeDatabase } from './db/connection';
 import { handleExploreCommand } from './commands/explore';
 import { handleWalletSet, handleWalletView, getWalletCommandBuilder } from './commands/wallet';
 import { handleInventoryCommand, getInventoryCommandBuilder } from './commands/inventory';
+import { handlePartyCreate, getPartyCommandBuilder } from './commands/party';
 import { handleBiomeSelect } from './handlers/biomeSelect';
 import { handleDurationSelect } from './handlers/durationSelect';
+import { handlePartyJoin } from './handlers/partyJoin';
 import { checkAndProcessExplorations } from './jobs/checkExplorations';
 import { SlashCommandBuilder } from 'discord.js';
 
@@ -48,6 +50,7 @@ client.once(Events.ClientReady, async (readyClient) => {
         .toJSON(),
       getWalletCommandBuilder().toJSON(),
       getInventoryCommandBuilder().toJSON(),
+      getPartyCommandBuilder().toJSON(),
     ];
 
     if (guildId) {
@@ -89,12 +92,19 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
     } else if (interaction.commandName === 'inventory') {
       await handleInventoryCommand(interaction);
+    } else if (interaction.commandName === 'party') {
+      const subcommand = interaction.options.getSubcommand();
+      if (subcommand === 'create') {
+        await handlePartyCreate(interaction);
+      }
     }
   } else if (interaction.isButton()) {
     if (interaction.customId.startsWith('biome_')) {
       await handleBiomeSelect(interaction);
     } else if (interaction.customId.startsWith('duration_')) {
       await handleDurationSelect(interaction);
+    } else if (interaction.customId.startsWith('party_join_')) {
+      await handlePartyJoin(interaction);
     }
   }
 });
