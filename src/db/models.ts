@@ -238,6 +238,9 @@ async function updateUserProfile(
       console.log(`📋 [UPDATE_USER_PROFILE] Current items:`, itemsFound.map((i: any) => `${i?.name || 'NO_NAME'} (${i?.rarity || 'NO_RARITY'})`).join(', '));
     }
 
+    // Track the item we're saving for verification
+    let itemToSave: ItemFound | null = null;
+    
     // Add new item if found
     if (itemFound) {
       console.log(`📋 [UPDATE_USER_PROFILE] Processing item to add:`, JSON.stringify(itemFound, null, 2));
@@ -261,7 +264,7 @@ async function updateUserProfile(
       }
       
       // Ensure itemFound has all required fields with normalized biome
-      const itemToSave: ItemFound = {
+      itemToSave = {
         name: itemFound.name,
         rarity: itemFound.rarity,
         biome: biomeName, // Use normalized biome name
@@ -271,11 +274,12 @@ async function updateUserProfile(
       
       // Check if item already exists (prevent duplicates)
       const itemExists = itemsFound.some((item: any) => 
-        item && item.name === itemToSave.name && item.rarity === itemToSave.rarity
+        item && item.name === itemToSave!.name && item.rarity === itemToSave!.rarity
       );
       
       if (itemExists) {
         console.log(`📋 [UPDATE_USER_PROFILE] ⚠️ Item "${itemToSave.name}" already exists, skipping duplicate`);
+        // Still set itemToSave so we can verify it exists
       } else {
         itemsFound.push(itemToSave);
         console.log(`📋 [UPDATE_USER_PROFILE] ✅ Added item "${itemToSave.name}" (${itemToSave.rarity})`);
@@ -330,20 +334,44 @@ async function updateUserProfile(
       throw new Error(`Failed to save all items for user ${userId}`);
     }
     
-    // CRITICAL: If item was found, verify it's actually in the saved items array
-    if (itemFound) {
-      console.log(`📋 [UPDATE_USER_PROFILE] Verifying item "${itemFound.name}" is in saved items...`);
-      const itemExists = savedItemsArray.some((item: any) => 
-        item && item.name === itemFound.name && item.rarity === itemFound.rarity
+    // CRITICAL: After update, query the database again to verify item was actually saved
+    // This is the key fix that worked before - verify from a fresh database query
+    if (itemToSave) {
+      console.log(`📋 [UPDATE_USER_PROFILE] 🔍 CRITICAL VERIFICATION: Querying database to confirm item was saved...`);
+      const verifyQuery = await db.query(
+        `SELECT items_found FROM user_profiles WHERE user_id = $1`,
+        [userId]
       );
       
-      if (!itemExists) {
-        console.error(`📋 [UPDATE_USER_PROFILE] ❌ CRITICAL: Item "${itemFound.name}" was NOT found in saved items!`);
-        console.error(`📋 [UPDATE_USER_PROFILE] Expected item:`, JSON.stringify(itemFound, null, 2));
-        console.error(`📋 [UPDATE_USER_PROFILE] Saved items:`, JSON.stringify(savedItemsArray, null, 2));
-        throw new Error(`Item "${itemFound.name}" was not saved to user profile inventory for user ${userId}`);
+      if (verifyQuery.rows.length === 0) {
+        console.error(`📋 [UPDATE_USER_PROFILE] ❌ CRITICAL: User profile not found after update!`);
+        throw new Error(`User profile was not found after update for user ${userId}`);
       }
-      console.log(`📋 [UPDATE_USER_PROFILE] ✅ Verified: Item "${itemFound.name}" is in saved items`);
+      
+      const verifiedItems = verifyQuery.rows[0].items_found;
+      const verifiedItemsArray = Array.isArray(verifiedItems) ? verifiedItems : [];
+      
+      console.log(`📋 [UPDATE_USER_PROFILE] Verified items in database: ${verifiedItemsArray.length}`);
+      
+      // Check if the normalized item (itemToSave) is in the verified items array
+      const itemExists = verifiedItemsArray.some((item: any) => {
+        if (!item || !item.name) return false;
+        // Compare by name and rarity - biome should already be normalized
+        const matches = item.name === itemToSave.name && item.rarity === itemToSave.rarity;
+        if (matches) {
+          console.log(`📋 [UPDATE_USER_PROFILE] ✅ Found matching item in verified data:`, JSON.stringify(item, null, 2));
+        }
+        return matches;
+      });
+      
+      if (!itemExists) {
+        console.error(`📋 [UPDATE_USER_PROFILE] ❌ CRITICAL: Item "${itemToSave.name}" was NOT found in database after update!`);
+        console.error(`📋 [UPDATE_USER_PROFILE] Expected item: name="${itemToSave.name}", rarity="${itemToSave.rarity}", biome="${itemToSave.biome}"`);
+        console.error(`📋 [UPDATE_USER_PROFILE] All items in database:`, JSON.stringify(verifiedItemsArray, null, 2));
+        throw new Error(`Item "${itemToSave.name}" was not saved to user profile inventory. Verification failed for user ${userId}`);
+      }
+      
+      console.log(`📋 [UPDATE_USER_PROFILE] ✅ CRITICAL VERIFICATION PASSED: Item "${itemToSave.name}" confirmed in database`);
     }
     
     console.log(`📋 [UPDATE_USER_PROFILE] ==========================================\n`);
