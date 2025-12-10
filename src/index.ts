@@ -9,6 +9,7 @@ import { handlePartyCreate, getPartyCommandBuilder } from './commands/party';
 import { handleDebugCommand, getDebugCommandBuilder } from './commands/debug';
 import { handleRepairCommand, getRepairCommandBuilder } from './commands/repair';
 import { handleEndAllCommand, getEndAllCommandBuilder } from './commands/endAll';
+import { handleEndCommand, getEndCommandBuilder } from './commands/end';
 import { handleBiomeSelect } from './handlers/biomeSelect';
 import { handleDurationSelect } from './handlers/durationSelect';
 import { handlePartyJoin } from './handlers/partyJoin';
@@ -57,6 +58,7 @@ client.once(Events.ClientReady, async (readyClient) => {
       getDebugCommandBuilder().toJSON(),
       getRepairCommandBuilder().toJSON(),
       getEndAllCommandBuilder().toJSON(),
+      getEndCommandBuilder().toJSON(),
     ];
 
     if (guildId) {
@@ -118,6 +120,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await handleRepairCommand(interaction);
     } else if (interaction.commandName === 'endall') {
       await handleEndAllCommand(interaction);
+    } else if (interaction.commandName === 'end') {
+      await handleEndCommand(interaction);
     }
   } else if (interaction.isButton()) {
     if (interaction.customId.startsWith('biome_')) {
