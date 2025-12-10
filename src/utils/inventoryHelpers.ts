@@ -270,9 +270,20 @@ export function buildBiomeProgress(itemsFound: ItemFound[]): BiomeProgress[] {
 
 /**
  * Format item line for embed
+ * Format: {biome-emoji}{rarity-emoji} Item Name (rarity) — count
  */
 export function formatItemLine(item: ItemCount): string {
   const rarityName = getRarityDisplayName(item.rarity);
-  return `${item.emoji} ${item.name} (${rarityName}) — ${item.count}x`;
+  
+  // Biome emoji mapping
+  const biomeEmojis: Record<string, string> = {
+    'Crystal Caverns': '💠',
+    'Withered Woods': '🌲',
+    'Rainforest Ruins': '🏺',
+  };
+  
+  const biomeEmoji = biomeEmojis[item.biome] || '';
+  
+  return `${biomeEmoji}${item.emoji} ${item.name} (${rarityName}) — ${item.count}x`;
 }
 

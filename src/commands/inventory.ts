@@ -1,15 +1,13 @@
 import { ChatInputCommandInteraction, EmbedBuilder, SlashCommandBuilder } from 'discord.js';
 import { getUserProfile } from '../db/models';
-import { getLongestStreak } from '../services/streakService';
+import { getCurrentStreak, getLongestStreak } from '../services/streakService';
 import {
   buildItemCounts,
-  getHighestRarity,
   buildBiomeProgress,
   formatItemLine,
 } from '../utils/inventoryHelpers';
-import { getRarityColor, getRarityDisplayName } from '../utils/rarityColors';
+import { getRarityColor } from '../utils/rarityColors';
 import { generateProgressBar, calculatePercentage } from '../utils/progressBar';
-import { RARITY_ORDER } from '../constants';
 
 /**
  * Handle /inventory command
@@ -31,8 +29,8 @@ export async function handleInventoryCommand(interaction: ChatInputCommandIntera
     // Get user data
     const itemsFound = profile.items_found || [];
     const totalExplorations = profile.total_explorations;
+    const currentStreak = await getCurrentStreak(userId);
     const longestStreak = await getLongestStreak(userId);
-    const highestRarity = getHighestRarity(itemsFound);
 
     // Debug logging - RAW DATA
     console.log(`📦 Inventory check for user ${userId}:`);
@@ -65,7 +63,7 @@ export async function handleInventoryCommand(interaction: ChatInputCommandIntera
     // Build embed
     const embed = new EmbedBuilder()
       .setTitle('🌿 Your Underlog Inventory')
-      .setColor(getRarityColor(highestRarity || 'uncommon'))
+      .setColor(getRarityColor('uncommon'))
       .setTimestamp();
 
     // Filter out items with 0 count for display
@@ -92,10 +90,8 @@ export async function handleInventoryCommand(interaction: ChatInputCommandIntera
     // Add stats
     const stats: string[] = [];
     stats.push(`📘 **Total Explorations:** ${totalExplorations}`);
+    stats.push(`🔥 **Current Streak:** ${currentStreak} day${currentStreak !== 1 ? 's' : ''}`);
     stats.push(`🔥 **Longest Streak:** ${longestStreak} day${longestStreak !== 1 ? 's' : ''}`);
-    stats.push(
-      `🏆 **Highest Rarity Found:** ${highestRarity ? getRarityDisplayName(highestRarity) : 'None'}`
-    );
 
     embed.addFields({
       name: '📊 Stats',
@@ -105,11 +101,20 @@ export async function handleInventoryCommand(interaction: ChatInputCommandIntera
 
     // Add biome collections
     const biomeProgress = buildBiomeProgress(itemsFound);
+    
+    // Biome emoji mapping
+    const biomeEmojis: Record<string, string> = {
+      'Crystal Caverns': '💠',
+      'Withered Woods': '🌲',
+      'Rainforest Ruins': '🏺',
+    };
+    
     const biomeFields = biomeProgress.map((biome) => {
       const percentage = calculatePercentage(biome.itemsFound, biome.totalItems);
       const progressBar = generateProgressBar(biome.itemsFound, biome.totalItems, 10);
+      const biomeEmoji = biomeEmojis[biome.biomeName] || '🌍';
       return {
-        name: `🌍 ${biome.biomeName} Collection — ${biome.itemsFound}/${biome.totalItems}`,
+        name: `${biomeEmoji} ${biome.biomeName} Collection — ${biome.itemsFound}/${biome.totalItems}`,
         value: `${progressBar} ${percentage}%`,
         inline: true,
       };
