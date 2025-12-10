@@ -223,40 +223,58 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
   );
 
   if (!result.rows[0]) {
+    console.log(`📭 No profile found for user ${userId}`);
     return null;
   }
 
   const profile = result.rows[0];
   
+  // Log RAW database data first
+  console.log(`🔍 DEBUG getUserProfile for user ${userId}:`);
+  console.log(`   Raw items_found type: ${typeof profile.items_found}`);
+  console.log(`   Raw items_found isArray: ${Array.isArray(profile.items_found)}`);
+  console.log(`   Raw items_found value:`, profile.items_found);
+  console.log(`   Raw items_found JSON:`, JSON.stringify(profile.items_found));
+  
   // Ensure items_found is always an array
   let itemsFound: ItemFound[] = [];
   if (Array.isArray(profile.items_found)) {
     itemsFound = profile.items_found;
+    console.log(`   ✅ Parsed as array: ${itemsFound.length} items`);
   } else if (profile.items_found && typeof profile.items_found === 'string') {
     try {
       itemsFound = JSON.parse(profile.items_found);
+      console.log(`   ✅ Parsed from string: ${itemsFound.length} items`);
     } catch (e) {
-      console.error(`❌ Error parsing items_found JSON for user ${userId}:`, e);
+      console.error(`   ❌ Error parsing items_found JSON for user ${userId}:`, e);
+      console.error(`   ❌ Raw string value:`, profile.items_found);
       itemsFound = [];
     }
   } else if (profile.items_found) {
     itemsFound = [profile.items_found];
+    console.log(`   ⚠️  Treated as single item object`);
+  } else {
+    console.log(`   ⚠️  items_found is null/undefined, using empty array`);
   }
   
   // Log what we retrieved
   console.log(`📥 Retrieved profile for user ${userId}: ${itemsFound.length} items from database`);
 
   // Parse dates in items_found
-  itemsFound = itemsFound.map((item: any) => {
+  itemsFound = itemsFound.map((item: any, index: number) => {
     if (!item || typeof item !== 'object') {
-      console.error(`❌ Invalid item in database for user ${userId}:`, item);
+      console.error(`❌ Invalid item at index ${index} in database for user ${userId}:`, item);
       return null;
     }
-    return {
+    const parsedItem = {
       ...item,
       found_at: item.found_at instanceof Date ? item.found_at : new Date(item.found_at),
     };
+    console.log(`   Item ${index}: ${parsedItem.name} (${parsedItem.rarity}) from ${parsedItem.biome}`);
+    return parsedItem;
   }).filter(item => item !== null) as ItemFound[];
+
+  console.log(`   ✅ Final parsed items count: ${itemsFound.length}`);
 
   return {
     ...profile,
