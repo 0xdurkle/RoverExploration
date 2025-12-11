@@ -3,6 +3,7 @@ import { getCompletedExplorations, Exploration } from '../db/models';
 import { finishExploration } from '../services/explorationService';
 import { getRarityEmoji } from '../services/rng';
 import { getBiome } from '../services/rng';
+import { getReturnWithItemMessage, getReturnEmptyMessage } from '../utils/messageVariations';
 
 /**
  * Check for completed explorations and post results
@@ -104,20 +105,22 @@ async function processGroupedExplorations(
 
     const usersText = userMentions.join(' ');
 
-    // Post result message
+    // Post result message using random variations
     if (group.itemName && group.itemRarity) {
-      // Use the actual item rarity from the group (which comes from the item found)
+      // Item found - use random message variation
       const emoji = getRarityEmoji(group.itemRarity);
-      const verb = group.explorations.length === 1 ? 'returns' : 'return';
-      await channel.send(
-        `${emoji} ${usersText} ${verb} from the **${group.biome}** and discovered the **${group.itemName}** (${group.itemRarity})!`
+      const message = getReturnWithItemMessage(
+        emoji,
+        usersText,
+        group.biome,
+        group.itemName,
+        group.itemRarity
       );
+      await channel.send(message);
     } else {
-      // Empty-handed
-      const verb = group.explorations.length === 1 ? 'returns' : 'return';
-      await channel.send(
-        `❌ ${usersText} ${verb} from the **${group.biome}** empty-handed.`
-      );
+      // Empty-handed - use random message variation
+      const message = getReturnEmptyMessage(usersText, group.biome);
+      await channel.send(message);
     }
   } catch (error) {
     console.error(`❌ Error processing grouped explorations:`, error);
@@ -144,16 +147,20 @@ async function processExploration(exploration: Exploration, channel: TextChannel
     const user = await channel.client.users.fetch(exploration.user_id);
     const userMention = user ? `<@${exploration.user_id}>` : `User ${exploration.user_id}`;
 
-    // Post result message
+    // Post result message using random variations
     if (itemFound) {
       const emoji = getRarityEmoji(itemFound.rarity);
-      await channel.send(
-        `${emoji} ${userMention} returns from the **${biomeName}** and discovered the **${itemFound.name}** (${itemFound.rarity})!`
+      const message = getReturnWithItemMessage(
+        emoji,
+        userMention,
+        biomeName,
+        itemFound.name,
+        itemFound.rarity
       );
+      await channel.send(message);
     } else {
-      await channel.send(
-        `❌ ${userMention} returns from the **${biomeName}** empty-handed.`
-      );
+      const message = getReturnEmptyMessage(userMention, biomeName);
+      await channel.send(message);
     }
   } catch (error) {
     console.error(`❌ Error processing exploration ${exploration.id}:`, error);

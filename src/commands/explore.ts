@@ -8,6 +8,7 @@ import { startExploration } from '../services/explorationService';
 import { getAllBiomes, getBiome, getDurationMultiplier } from '../services/rng';
 import { getCooldownRemaining, formatTimeRemaining } from '../services/cooldownService';
 import { safeDeferReply, safeEditReply } from '../utils/interactionHelpers';
+import { getExplorationStartMessage } from '../utils/messageVariations';
 
 /**
  * Get command builder for /explore
@@ -119,14 +120,20 @@ export async function handleExploreCommand(interaction: ChatInputCommandInteract
     await startExploration(userId, biomeId, durationHours);
     console.log(`🌍 [EXPLORE] ✅ Exploration created`);
     
-    // Format duration for display
+    // Format duration for display (add multiplier to durationText if applicable)
     const multiplier = getDurationMultiplier(durationHours);
-    const multiplierText = multiplier > 1 ? ` (${multiplier}x item odds)` : '';
+    let displayDuration = durationText;
+    if (multiplier > 1) {
+      displayDuration = `${durationText} (${multiplier}x item odds)`;
+    }
+    
+    // Get random exploration start message variation
+    const userMention = `<@${userId}>`;
+    const message = getExplorationStartMessage(userMention, biome.name, displayDuration);
     
     // Send public confirmation message
-    const userMention = `<@${userId}>`;
     await safeEditReply(interaction, {
-      content: `${userMention} enters the **${biome.name}** for **${durationText}**${multiplierText}. Tracks vanish behind them.`,
+      content: message,
     });
   } catch (error: any) {
     console.error(`🌍 [EXPLORE] ❌ Error:`, error);
