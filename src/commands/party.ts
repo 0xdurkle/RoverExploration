@@ -301,11 +301,11 @@ async function completePartyExpedition(client: any, partyId: string): Promise<vo
       
       if (partySize === 1) {
         // Solo exploration
-        message = `🟤 <@${party.joinedUsers[0].userId}> returns from the **${party.biomeName}** empty-handed.`;
+        message = `❌ <@${party.joinedUsers[0].userId}> returns from the **${party.biomeName}** empty-handed.`;
       } else {
         // Party exploration
         const userMentions = party.joinedUsers.map((u) => `<@${u.userId}>`).join(' ');
-        message = `🟤 ${userMentions} return from the **${party.biomeName}** empty-handed.`;
+        message = `❌ ${userMentions} return from the **${party.biomeName}** empty-handed.`;
       }
       
       await (channel as any).send(message);

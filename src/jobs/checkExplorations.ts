@@ -116,7 +116,7 @@ async function processGroupedExplorations(
       // Empty-handed
       const verb = group.explorations.length === 1 ? 'returns' : 'return';
       await channel.send(
-        `🟤 ${usersText} ${verb} from the **${group.biome}** empty-handed.`
+        `❌ ${usersText} ${verb} from the **${group.biome}** empty-handed.`
       );
     }
   } catch (error) {
@@ -152,7 +152,7 @@ async function processExploration(exploration: Exploration, channel: TextChannel
       );
     } else {
       await channel.send(
-        `🟤 ${userMention} returns from the **${biomeName}** empty-handed.`
+        `❌ ${userMention} returns from the **${biomeName}** empty-handed.`
       );
     }
   } catch (error) {
