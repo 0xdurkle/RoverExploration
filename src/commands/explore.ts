@@ -7,8 +7,6 @@ import {
 import { startExploration } from '../services/explorationService';
 import { getAllBiomes, getBiome, getDurationMultiplier } from '../services/rng';
 import { getCooldownRemaining, formatTimeRemaining } from '../services/cooldownService';
-import { getExplorationStartMessage } from '../utils/messageVariations';
-import { markStartMessageSent } from '../db/models';
 import { safeDeferReply, safeEditReply } from '../utils/interactionHelpers';
 
 /**
@@ -99,8 +97,8 @@ export async function handleExploreCommand(interaction: ChatInputCommandInteract
     
     // Create exploration in database
     console.log(`🌍 [EXPLORE] Creating exploration: user=${userId}, biome=${biomeId}, duration=${durationHours}h`);
-    const exploration = await startExploration(userId, biomeId, durationHours);
-    console.log(`🌍 [EXPLORE] ✅ Exploration created: ID ${exploration.id}`);
+    await startExploration(userId, biomeId, durationHours);
+    console.log(`🌍 [EXPLORE] ✅ Exploration created`);
     
     // Format duration for display
     const multiplier = getDurationMultiplier(durationHours);
@@ -110,34 +108,6 @@ export async function handleExploreCommand(interaction: ChatInputCommandInteract
     await safeEditReply(interaction, {
       content: `🚀 You set off into the **${biome.name}** for **${durationText}**${multiplierText}.\n\nI'll notify you when you return!`,
     });
-    
-    // CRITICAL: Atomic database operation to send public message
-    // Only ONE handler can successfully mark message as sent
-    const channelId = process.env.DISCORD_CHANNEL_ID;
-    if (channelId) {
-      const shouldSendMessage = await markStartMessageSent(exploration.id);
-      
-      if (shouldSendMessage) {
-        // We got the lock - send the ONE message
-        try {
-          console.log(`🌍 [EXPLORE] Sending public message for exploration ${exploration.id}`);
-          const publicChannel = await interaction.client.channels.fetch(channelId);
-          if (publicChannel && publicChannel.isTextBased()) {
-            const userMention = `<@${userId}>`;
-            const message = getExplorationStartMessage(userMention, `**${biome.name}**`, `**${durationText}**`);
-            await (publicChannel as TextChannel).send(message);
-            console.log(`🌍 [EXPLORE] ✅ Sent public message for exploration ${exploration.id}`);
-          }
-        } catch (error) {
-          console.error(`🌍 [EXPLORE] ❌ Error sending public message:`, error);
-          // Don't fail exploration if message fails
-        }
-      } else {
-        // Message already sent by another call - this should never happen with slash commands
-        // but we handle it gracefully
-        console.log(`🌍 [EXPLORE] ⚠️ Message already sent for exploration ${exploration.id} (unexpected)`);
-      }
-    }
   } catch (error: any) {
     console.error(`🌍 [EXPLORE] ❌ Error:`, error);
     

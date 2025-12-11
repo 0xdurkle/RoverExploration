@@ -3,8 +3,8 @@ import { config } from 'dotenv';
 import * as cron from 'node-cron';
 import { initDatabase, closeDatabase } from './db/connection';
 import { handleExploreCommand } from './commands/explore';
-import { handleBiomeSelect } from './handlers/biomeSelect';
-import { handleDurationSelect } from './handlers/durationSelect';
+import { handleHowCommand } from './commands/how';
+import { handleHowNavigation } from './handlers/howNavigation';
 import { checkAndProcessExplorations } from './jobs/checkExplorations';
 
 // Load environment variables
@@ -43,6 +43,10 @@ client.once(Events.ClientReady, async (readyClient) => {
         name: 'explore',
         description: 'Start an exploration expedition in a biome',
       },
+      {
+        name: 'how',
+        description: 'Show a field guide explaining how The Underlog works',
+      },
     ];
 
     if (guildId) {
@@ -69,17 +73,17 @@ client.once(Events.ClientReady, async (readyClient) => {
   console.log('✅ Cron job started (checking every 2 minutes)');
 });
 
-// Handle slash commands
+// Handle slash commands and interactions
 client.on(Events.InteractionCreate, async (interaction) => {
   if (interaction.isChatInputCommand()) {
     if (interaction.commandName === 'explore') {
       await handleExploreCommand(interaction);
+    } else if (interaction.commandName === 'how') {
+      await handleHowCommand(interaction);
     }
   } else if (interaction.isButton()) {
-    if (interaction.customId.startsWith('biome_')) {
-      await handleBiomeSelect(interaction);
-    } else if (interaction.customId.startsWith('duration_')) {
-      await handleDurationSelect(interaction);
+    if (interaction.customId.startsWith('how_nav_')) {
+      await handleHowNavigation(interaction);
     }
   }
 });
