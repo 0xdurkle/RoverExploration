@@ -53,15 +53,30 @@ client.once(Events.ClientReady, async (readyClient) => {
       getEndAllCommandBuilder().toJSON(),
     ];
 
+    // Log explore command structure for debugging
+    const exploreCmd = commands.find(cmd => cmd.name === 'explore');
+    if (exploreCmd) {
+      console.log('📋 [COMMAND_REGISTRATION] Explore command structure:', JSON.stringify(exploreCmd, null, 2));
+      console.log(`📋 [COMMAND_REGISTRATION] Explore command has ${exploreCmd.options?.length || 0} options`);
+      if (exploreCmd.options) {
+        exploreCmd.options.forEach((opt: any) => {
+          console.log(`   - Option: ${opt.name} (required: ${opt.required}, choices: ${opt.choices?.length || 0})`);
+        });
+      }
+    }
+
     if (guildId) {
       // Register commands to specific guild (instant)
       const guild = await readyClient.guilds.fetch(guildId);
       await guild.commands.set(commands);
-      console.log('✅ Slash commands registered to guild');
+      console.log(`✅ Slash commands registered to guild ${guildId}`);
+      console.log(`   Registered ${commands.length} commands`);
     } else {
       // Register commands globally (may take up to 1 hour)
       await readyClient.application?.commands.set(commands);
       console.log('✅ Slash commands registered globally');
+      console.log(`   Registered ${commands.length} commands`);
+      console.log('   ⚠️  Note: Global command updates may take up to 1 hour to propagate');
     }
   } catch (error) {
     console.error('❌ Error registering commands:', error);

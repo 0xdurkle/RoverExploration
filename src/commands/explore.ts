@@ -53,9 +53,28 @@ export async function handleExploreCommand(interaction: ChatInputCommandInteract
     // Defer reply immediately
     await safeDeferReply(interaction, { ephemeral: true });
     
-    // Get options
-    const biomeId = interaction.options.getString('biome', true);
-    const durationText = interaction.options.getString('duration', true);
+    // Get options (with defensive checks)
+    const biomeOption = interaction.options.get('biome');
+    const durationOption = interaction.options.get('duration');
+    
+    if (!biomeOption) {
+      console.error(`🌍 [EXPLORE] ❌ Biome option not found. Available options:`, interaction.options.data.map(o => o.name));
+      await safeEditReply(interaction, {
+        content: '❌ The biome option was not found. This might be because the command needs to be re-registered. Please wait a moment and try again, or contact an admin.',
+      });
+      return;
+    }
+    
+    if (!durationOption) {
+      console.error(`🌍 [EXPLORE] ❌ Duration option not found. Available options:`, interaction.options.data.map(o => o.name));
+      await safeEditReply(interaction, {
+        content: '❌ The duration option was not found. This might be because the command needs to be re-registered. Please wait a moment and try again, or contact an admin.',
+      });
+      return;
+    }
+    
+    const biomeId = biomeOption.value as string;
+    const durationText = durationOption.value as string;
     
     // Validate biome
     const biome = getBiome(biomeId);
