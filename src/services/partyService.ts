@@ -154,11 +154,11 @@ export function cleanupOldParties(): void {
 
 /**
  * Calculate party bonuses based on party size
- * Each additional person (beyond creator) adds:
- * - +1% base to all rarities
- * - +1% uncommon
- * - +0.5% rare
- * - +0.25% legendary
+ * Each additional person (beyond creator) adds to BASE probability:
+ * - Uncommon: +2% per additional player
+ * - Rare: +1% per additional player
+ * - Legendary: +0.25% per additional player
+ * - Fragment (epic): +0.0625% per additional player
  */
 export function calculatePartyBonus(partySize: number, rarity: string): number {
   // Additional members = partySize - 1 (excluding creator)
@@ -170,23 +170,22 @@ export function calculatePartyBonus(partySize: number, rarity: string): number {
     return 0; // No bonus if only creator
   }
 
-  // Base bonus: +1% per additional member (applies to all rarities)
-  const baseBonus = effectiveAdditional * 0.01;
-
-  // Rarity-specific bonuses
+  // Rarity-specific bonuses (added to BASE probability)
   const rarityBonuses: Record<string, number> = {
-    uncommon: 0.01, // +1% per additional member
-    rare: 0.005, // +0.5% per additional member
+    uncommon: 0.02, // +2% per additional member
+    rare: 0.01, // +1% per additional member
     legendary: 0.0025, // +0.25% per additional member
+    epic: 0.000625, // +0.0625% per additional member (Fragment)
   };
 
   const rarityBonus = (rarityBonuses[rarity.toLowerCase()] || 0) * effectiveAdditional;
 
-  return baseBonus + rarityBonus;
+  return rarityBonus;
 }
 
 /**
  * Apply party bonuses to base probability
+ * This adds to the BASE probability before duration multiplier is applied
  */
 export function applyPartyBonus(baseProbability: number, rarity: string, partySize: number): number {
   const bonus = calculatePartyBonus(partySize, rarity);

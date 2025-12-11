@@ -5,19 +5,24 @@
       "name": "Crystal Caverns",
       "items": [
         {
-          "name": "Shard of Echoing Quartz",
-          "rarity": "uncommon",
-          "baseProbability": 0.07
-        },
-        {
-          "name": "Resonant Geode Core",
-          "rarity": "rare",
-          "baseProbability": 0.02
+          "name": "Rover Head Fragment",
+          "rarity": "epic",
+          "baseProbability": 0.0025
         },
         {
           "name": "Aurora Heart Crystal",
           "rarity": "legendary",
-          "baseProbability": 0.0025
+          "baseProbability": 0.01
+        },
+        {
+          "name": "Resonant Geode Core",
+          "rarity": "rare",
+          "baseProbability": 0.04
+        },
+        {
+          "name": "Shard of Echoing Quartz",
+          "rarity": "uncommon",
+          "baseProbability": 0.08
         }
       ]
     },
@@ -26,19 +31,24 @@
       "name": "Withered Woods",
       "items": [
         {
-          "name": "Hollowwood Husk",
-          "rarity": "uncommon",
-          "baseProbability": 0.08
-        },
-        {
-          "name": "Spore-Touched Carapace",
-          "rarity": "rare",
-          "baseProbability": 0.02
+          "name": "Rover Body Fragment",
+          "rarity": "epic",
+          "baseProbability": 0.0025
         },
         {
           "name": "The Rootmind Branch",
           "rarity": "legendary",
-          "baseProbability": 0.002
+          "baseProbability": 0.01
+        },
+        {
+          "name": "Spore-Touched Carapace",
+          "rarity": "rare",
+          "baseProbability": 0.04
+        },
+        {
+          "name": "Hollowwood Husk",
+          "rarity": "uncommon",
+          "baseProbability": 0.08
         }
       ]
     },
@@ -47,19 +57,24 @@
       "name": "Rainforest Ruins",
       "items": [
         {
-          "name": "Moss-Veiled Relic",
-          "rarity": "uncommon",
-          "baseProbability": 0.07
-        },
-        {
-          "name": "Ancient Stone Glyph",
-          "rarity": "rare",
-          "baseProbability": 0.015
+          "name": "Rover Wheel Fragment",
+          "rarity": "epic",
+          "baseProbability": 0.0025
         },
         {
           "name": "The Echo Crown",
           "rarity": "legendary",
-          "baseProbability": 0.0015
+          "baseProbability": 0.01
+        },
+        {
+          "name": "Ancient Stone Glyph",
+          "rarity": "rare",
+          "baseProbability": 0.04
+        },
+        {
+          "name": "Moss-Veiled Relic",
+          "rarity": "uncommon",
+          "baseProbability": 0.08
         }
       ]
     }
@@ -67,19 +82,19 @@
   "durations": [
     {
       "hours": 1,
-      "multiplier": 1.0
+      "multiplier": 0.5
     },
     {
       "hours": 3,
-      "multiplier": 1.25
+      "multiplier": 1.0
     },
     {
       "hours": 6,
-      "multiplier": 1.5
+      "multiplier": 2.0
     },
     {
       "hours": 12,
-      "multiplier": 2.0
+      "multiplier": 4.0
     }
   ],
   "rarityEmojis": {

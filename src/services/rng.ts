@@ -8,7 +8,7 @@ interface Biome {
 
 interface Item {
   name: string;
-  rarity: 'uncommon' | 'rare' | 'legendary';
+  rarity: 'uncommon' | 'rare' | 'legendary' | 'epic';
   baseProbability: number;
 }
 
@@ -19,32 +19,57 @@ interface Duration {
 
 /**
  * Calculate item discovery based on RNG
- * Checks items in order: Legendary → Rare → Uncommon
+ * Checks items in order: Epic → Legendary → Rare → Uncommon
  * Returns null if nothing found
  */
 export function discoverItem(biomeId: string, durationHours: number): {
   name: string;
-  rarity: 'uncommon' | 'rare' | 'legendary';
+  rarity: 'uncommon' | 'rare' | 'legendary' | 'epic';
 } | null {
   const biome = (biomesData.biomes as Biome[]).find(b => b.id === biomeId);
   if (!biome) {
     throw new Error(`Biome ${biomeId} not found`);
   }
 
-  const duration = (biomesData.durations as Duration[]).find(d => d.hours === durationHours);
-  if (!duration) {
-    throw new Error(`Duration ${durationHours} hours not found`);
+  // Check if this is a 30-second exploration (for testing with special probabilities)
+  const is30Second = Math.abs(durationHours - 0.008333) < 0.0001;
+
+  // Special probabilities for 30-second testing
+  const testProbabilities = {
+    uncommon: 0.33, // 33%
+    rare: 0.15, // 15%
+    legendary: 0.07, // 7%
+    epic: 0.03, // 3% (Fragment)
+  };
+
+  // Get duration multiplier
+  let durationMultiplier = 1.0;
+  if (!is30Second) {
+    const duration = (biomesData.durations as Duration[]).find(d => Math.abs(d.hours - durationHours) < 0.0001);
+    if (!duration) {
+      throw new Error(`Duration ${durationHours} hours not found`);
+    }
+    durationMultiplier = duration.multiplier;
   }
 
-  // Sort items by rarity (legendary first, then rare, then uncommon)
+  // Sort items by rarity (epic first, then legendary, then rare, then uncommon)
   const sortedItems = [...biome.items].sort((a, b) => {
-    const rarityOrder = { legendary: 0, rare: 1, uncommon: 2 };
+    const rarityOrder = { epic: 0, legendary: 1, rare: 2, uncommon: 3 };
     return rarityOrder[a.rarity] - rarityOrder[b.rarity];
   });
 
   // Check each item in order (rarest first)
   for (const item of sortedItems) {
-    const adjustedProbability = item.baseProbability * duration.multiplier;
+    let adjustedProbability: number;
+
+    if (is30Second) {
+      // Use special test probabilities for 30-second explorations
+      adjustedProbability = testProbabilities[item.rarity] || 0;
+    } else {
+      // Apply duration multiplier to base probability
+      adjustedProbability = item.baseProbability * durationMultiplier;
+    }
+
     const roll = Math.random();
 
     if (roll < adjustedProbability) {
@@ -85,5 +110,7 @@ export function getDurationMultiplier(durationHours: number): number {
  * Get rarity emoji
  */
 export function getRarityEmoji(rarity: 'uncommon' | 'rare' | 'legendary' | 'epic'): string {
-  return biomesData.rarityEmojis[rarity] || '⚪';
+  // Map epic to fragment emoji
+  const rarityKey = rarity === 'epic' ? 'epic' : rarity;
+  return biomesData.rarityEmojis[rarityKey] || '⚪';
 }

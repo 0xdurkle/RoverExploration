@@ -14,7 +14,7 @@ export interface Exploration {
 
 export interface ItemFound {
   name: string;
-  rarity: 'uncommon' | 'rare' | 'legendary';
+  rarity: 'uncommon' | 'rare' | 'legendary' | 'epic';
   biome: string;
   found_at: Date;
 }

@@ -46,7 +46,7 @@ export async function checkAndProcessExplorations(client: Client): Promise<void>
       explorations: Exploration[]; 
       biome: string; 
       itemName: string | null; 
-      itemRarity: 'uncommon' | 'rare' | 'legendary' | null 
+      itemRarity: 'uncommon' | 'rare' | 'legendary' | 'epic' | null 
     }>();
     
     for (const { exploration, itemFound } of explorationResults.values()) {
@@ -85,7 +85,7 @@ async function processGroupedExplorations(
     explorations: Exploration[]; 
     biome: string; 
     itemName: string | null; 
-    itemRarity: 'uncommon' | 'rare' | 'legendary' | null 
+    itemRarity: 'uncommon' | 'rare' | 'legendary' | 'epic' | null 
   },
   channel: TextChannel
 ): Promise<void> {

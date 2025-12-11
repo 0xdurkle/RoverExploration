@@ -14,17 +14,18 @@ interface Biome {
 
 interface Item {
   name: string;
-  rarity: 'uncommon' | 'rare' | 'legendary';
+  rarity: 'uncommon' | 'rare' | 'legendary' | 'epic';
   baseProbability: number;
 }
 
 /**
  * Roll for item discovery with party bonuses
  * All party members get the same result
+ * Party bonuses are added to BASE probability, then duration multiplier is applied
  */
 export function rollPartyLoot(biomeId: string, durationHours: number, partySize: number): {
   name: string;
-  rarity: 'uncommon' | 'rare' | 'legendary';
+  rarity: 'uncommon' | 'rare' | 'legendary' | 'epic';
 } | null {
   const biome = (biomesData.biomes as Biome[]).find((b) => b.id === biomeId);
   if (!biome) {
@@ -36,9 +37,10 @@ export function rollPartyLoot(biomeId: string, durationHours: number, partySize:
 
   // Special probabilities for 30-second testing
   const testProbabilities = {
-    uncommon: 0.25, // 25%
-    rare: 0.125, // 12.5%
-    legendary: 0.05, // 5%
+    uncommon: 0.33, // 33%
+    rare: 0.15, // 15%
+    legendary: 0.07, // 7%
+    epic: 0.03, // 3% (Fragment)
   };
 
   // Get duration multiplier
@@ -48,9 +50,9 @@ export function rollPartyLoot(biomeId: string, durationHours: number, partySize:
     durationMultiplier = duration?.multiplier || 1.0;
   }
 
-  // Sort items by rarity (legendary first, then rare, then uncommon)
+  // Sort items by rarity (epic first, then legendary, then rare, then uncommon)
   const sortedItems = [...biome.items].sort((a, b) => {
-    const rarityOrder = { legendary: 0, rare: 1, uncommon: 2 };
+    const rarityOrder = { epic: 0, legendary: 1, rare: 2, uncommon: 3 };
     return rarityOrder[a.rarity] - rarityOrder[b.rarity];
   });
 
@@ -59,15 +61,14 @@ export function rollPartyLoot(biomeId: string, durationHours: number, partySize:
     let adjustedProbability: number;
 
     if (is30Second) {
-      // Use special test probabilities for 30-second explorations
-      adjustedProbability = testProbabilities[item.rarity];
+      // Use special test probabilities for 30-second explorations (no party bonus for testing)
+      adjustedProbability = testProbabilities[item.rarity] || 0;
     } else {
-      // Use normal multiplier system for other durations
-      adjustedProbability = item.baseProbability * durationMultiplier;
+      // Apply party bonus to BASE probability first
+      const baseWithBonus = applyPartyBonus(item.baseProbability, item.rarity, partySize);
+      // Then apply duration multiplier
+      adjustedProbability = baseWithBonus * durationMultiplier;
     }
-
-    // Apply party bonus (scales with party size)
-    adjustedProbability = applyPartyBonus(adjustedProbability, item.rarity, partySize);
 
     const roll = Math.random();
 
