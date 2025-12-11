@@ -5,6 +5,7 @@ import { initDatabase, closeDatabase } from './db/connection';
 import { handleExploreCommand } from './commands/explore';
 import { handleHowCommand } from './commands/how';
 import { handlePartyCreate, getPartyCommandBuilder } from './commands/party';
+import { handleEndAllCommand, getEndAllCommandBuilder } from './commands/endAll';
 import { handleHowNavigation } from './handlers/howNavigation';
 import { handlePartyJoin } from './handlers/partyJoin';
 import { checkAndProcessExplorations } from './jobs/checkExplorations';
@@ -50,6 +51,7 @@ client.once(Events.ClientReady, async (readyClient) => {
         description: 'Show a field guide explaining how The Underlog works',
       },
       getPartyCommandBuilder().toJSON(),
+      getEndAllCommandBuilder().toJSON(),
     ];
 
     if (guildId) {
@@ -88,6 +90,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (subcommand === 'create') {
         await handlePartyCreate(interaction);
       }
+    } else if (interaction.commandName === 'endall') {
+      await handleEndAllCommand(interaction);
     }
   } else if (interaction.isButton()) {
     if (interaction.customId.startsWith('how_nav_')) {

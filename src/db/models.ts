@@ -177,3 +177,47 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
     last_exploration_end: profile.last_exploration_end || null,
   };
 }
+
+/**
+ * End all active explorations (admin command)
+ * Marks all incomplete explorations as completed
+ */
+export async function endAllExplorations(): Promise<{ count: number; explorations: Exploration[] }> {
+  const db = getDb();
+  const now = new Date();
+
+  try {
+    console.log(`\n🛑 [END_ALL_EXPLORATIONS] Starting to end all active explorations...`);
+    
+    // Get all incomplete explorations
+    const getIncomplete = await db.query(
+      `SELECT * FROM explorations 
+       WHERE completed = FALSE 
+       ORDER BY id ASC`
+    );
+    
+    if (getIncomplete.rows.length === 0) {
+      return { count: 0, explorations: [] };
+    }
+
+    // Mark all incomplete explorations as completed
+    // If they don't have an item_found, set it to NULL
+    const updateResult = await db.query(
+      `UPDATE explorations 
+       SET completed = TRUE, 
+           item_found = COALESCE(item_found, NULL)
+       WHERE completed = FALSE
+       RETURNING *`
+    );
+
+    console.log(`🛑 [END_ALL_EXPLORATIONS] ✅ Updated ${updateResult.rows.length} explorations`);
+
+    return {
+      count: updateResult.rows.length,
+      explorations: updateResult.rows as Exploration[]
+    };
+  } catch (error) {
+    console.error(`🛑 [END_ALL_EXPLORATIONS] ❌ Error ending all explorations:`, error);
+    throw error;
+  }
+}
