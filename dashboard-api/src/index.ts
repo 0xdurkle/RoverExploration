@@ -78,6 +78,20 @@ app.get('/api/users', async (req, res) => {
     
     const hasWalletsTable = walletsTableCheck.rows[0].exists;
     
+    // Debug: Check if wallets table has any data
+    if (hasWalletsTable) {
+      try {
+        const walletCount = await db.query('SELECT COUNT(*) as count FROM user_wallets');
+        console.log(`📊 Total wallets in database: ${walletCount.rows[0].count}`);
+        if (parseInt(walletCount.rows[0].count) > 0) {
+          const sampleWallets = await db.query('SELECT discord_id, wallet_address FROM user_wallets LIMIT 5');
+          console.log('📊 Sample wallets:', sampleWallets.rows);
+        }
+      } catch (e) {
+        console.error('Error checking wallet count:', e);
+      }
+    }
+    
     // Get all users - start with wallets table as primary source to ensure all wallets are included
     let allUsers: any[] = [];
     
