@@ -78,23 +78,49 @@ app.get('/api/users', async (req, res) => {
     
     const hasWalletsTable = walletsTableCheck.rows[0].exists;
     
-    // Get all user profiles with wallets
-    let profilesResult;
+    // Get all users - start with wallets table as primary source to ensure all wallets are included
+    let allUsers: any[] = [];
+    
     if (hasWalletsTable) {
-      profilesResult = await db.query(`
+      // First, get all wallets with their profiles (if they exist)
+      const walletsWithProfiles = await db.query(`
+        SELECT 
+          COALESCE(up.user_id, uw.discord_id) as user_id,
+          uw.wallet_address,
+          COALESCE(up.total_explorations, 0) as total_explorations,
+          COALESCE(up.items_found, '[]'::JSONB) as items_found,
+          up.last_exploration_end,
+          COALESCE(up.created_at, uw.created_at) as created_at
+        FROM user_wallets uw
+        LEFT JOIN user_profiles up ON uw.discord_id = up.user_id
+        ORDER BY COALESCE(up.created_at, uw.created_at) DESC
+      `);
+      
+      console.log(`✅ Found ${walletsWithProfiles.rows.length} users with wallets`);
+      
+      // Also get users with profiles but no wallets (for completeness)
+      const profilesWithoutWallets = await db.query(`
         SELECT 
           up.user_id,
+          NULL::VARCHAR as wallet_address,
           up.total_explorations,
           up.items_found,
           up.last_exploration_end,
-          up.created_at,
-          uw.wallet_address
+          up.created_at
         FROM user_profiles up
         LEFT JOIN user_wallets uw ON up.user_id = uw.discord_id
+        WHERE uw.discord_id IS NULL
         ORDER BY up.created_at DESC
       `);
+      
+      console.log(`✅ Found ${profilesWithoutWallets.rows.length} users with profiles but no wallets`);
+      
+      // Combine both - wallets take priority (already included above)
+      // Add profiles without wallets
+      allUsers = [...walletsWithProfiles.rows, ...profilesWithoutWallets.rows];
     } else {
-      profilesResult = await db.query(`
+      // No wallets table, just get profiles
+      const profilesResult = await db.query(`
         SELECT 
           user_id,
           total_explorations,
@@ -104,35 +130,9 @@ app.get('/api/users', async (req, res) => {
         FROM user_profiles
         ORDER BY created_at DESC
       `);
+      allUsers = profilesResult.rows;
+      console.log(`✅ Found ${profilesResult.rows.length} user profiles (no wallets table)`);
     }
-
-    console.log(`✅ Found ${profilesResult.rows.length} user profiles`);
-
-    // Also get all users who have wallets but no profile yet (for completeness)
-    let walletOnlyUsers: any[] = [];
-    if (hasWalletsTable) {
-      try {
-        const walletOnlyResult = await db.query(`
-          SELECT 
-            uw.discord_id as user_id,
-            uw.wallet_address,
-            NULL::INTEGER as total_explorations,
-            '[]'::JSONB as items_found,
-            NULL::TIMESTAMP as last_exploration_end,
-            uw.created_at
-          FROM user_wallets uw
-          LEFT JOIN user_profiles up ON uw.discord_id = up.user_id
-          WHERE up.user_id IS NULL
-        `);
-        walletOnlyUsers = walletOnlyResult.rows;
-        console.log(`✅ Found ${walletOnlyUsers.length} users with wallets but no profile`);
-      } catch (e) {
-        console.error('Error fetching wallet-only users:', e);
-      }
-    }
-
-    // Combine profiles and wallet-only users
-    const allUsers = [...profilesResult.rows, ...walletOnlyUsers];
 
     // Fetch Discord usernames and wallets
     const users = await Promise.all(allUsers.map(async (row) => {
@@ -152,8 +152,13 @@ app.get('/api/users', async (req, res) => {
       // Get Discord username
       const discordName = await getDiscordUsername(row.user_id);
       
-      // Get wallet address from the joined result
+      // Get wallet address from the result
       let walletAddress = row.wallet_address || null;
+      
+      // Debug logging for wallets
+      if (walletAddress) {
+        console.log(`  - User ${row.user_id} has wallet: ${walletAddress}`);
+      }
 
       return {
         discordId: row.user_id,
