@@ -9,7 +9,21 @@ export async function handleWalletSet(
   interaction: ChatInputCommandInteraction,
   address: string
 ): Promise<void> {
-  await interaction.deferReply({ ephemeral: true });
+  try {
+    await interaction.deferReply({ ephemeral: true });
+  } catch (error: any) {
+    console.error('Error deferring reply in wallet set:', error);
+    // If defer fails, try to reply directly
+    try {
+      await interaction.reply({
+        content: '❌ An error occurred. Please try again.',
+        ephemeral: true,
+      });
+    } catch (replyError) {
+      console.error('Error replying in wallet set:', replyError);
+    }
+    return;
+  }
 
   try {
     // Check if user already has a wallet
@@ -50,33 +64,53 @@ export async function handleWalletSet(
     });
   } catch (error: any) {
     console.error('Error saving wallet:', error);
+    console.error('Error stack:', error?.stack);
+    console.error('Error details:', {
+      code: error?.code,
+      constraint: error?.constraint,
+      message: error?.message,
+    });
     
-    // Check for unique constraint violation (wallet already linked to another account)
-    if (error.code === '23505') {
-      if (error.constraint === 'user_wallets_wallet_address_unique') {
-        await interaction.editReply({
-          content: '❌ This wallet address is already linked to another Discord account. Each wallet can only be linked to one account.',
-        });
-        return;
-      } else if (error.constraint === 'user_wallets_discord_id_unique') {
+    try {
+      // Check for unique constraint violation (wallet already linked to another account)
+      if (error.code === '23505') {
+        if (error.constraint === 'user_wallets_wallet_address_unique') {
+          await interaction.editReply({
+            content: '❌ This wallet address is already linked to another Discord account. Each wallet can only be linked to one account.',
+          });
+          return;
+        } else if (error.constraint === 'user_wallets_discord_id_unique') {
+          await interaction.editReply({
+            content: '❌ You already have a wallet linked. Contact an admin if you need to reset it.',
+          });
+          return;
+        }
+      }
+      
+      // Check for custom error from saveUserWallet
+      if (error.message && error.message.includes('already exists')) {
         await interaction.editReply({
           content: '❌ You already have a wallet linked. Contact an admin if you need to reset it.',
         });
         return;
       }
-    }
-    
-    // Check for custom error from saveUserWallet
-    if (error.message && error.message.includes('already exists')) {
+      
+      // Generic error message
       await interaction.editReply({
-        content: '❌ You already have a wallet linked. Contact an admin if you need to reset it.',
+        content: '❌ An error occurred while saving your wallet address. Please try again.',
       });
-      return;
+    } catch (replyError: any) {
+      // If editReply fails, try followUp as fallback
+      console.error('Error sending error reply:', replyError);
+      try {
+        await interaction.followUp({
+          content: '❌ An error occurred while saving your wallet address. Please try again.',
+          ephemeral: true,
+        });
+      } catch (followUpError) {
+        console.error('Error sending followUp:', followUpError);
+      }
     }
-    
-    await interaction.editReply({
-      content: '❌ An error occurred while saving your wallet address. Please try again.',
-    });
   }
 }
 
