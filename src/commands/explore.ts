@@ -134,13 +134,12 @@ export async function handleExploreCommand(interaction: ChatInputCommandInteract
     // Send ephemeral confirmation to user first
     await safeEditReply(interaction, {
       content: '✅ Exploration started!',
-      ephemeral: true,
     });
     
-    // Then send public message to channel (not as a reply)
+    // Then send public message to channel (not as a reply, standalone comment)
     const channel = interaction.channel;
-    if (channel && channel.isTextBased()) {
-      await channel.send(message);
+    if (channel && 'send' in channel && channel.isTextBased()) {
+      await (channel as TextChannel).send(message);
     }
   } catch (error: any) {
     console.error(`🌍 [EXPLORE] ❌ Error:`, error);
