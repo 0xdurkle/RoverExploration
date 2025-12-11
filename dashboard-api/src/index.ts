@@ -97,6 +97,10 @@ app.get('/api/users', async (req, res) => {
       `);
       
       console.log(`✅ Found ${walletsWithProfiles.rows.length} users with wallets`);
+      // Log first few wallets for debugging
+      walletsWithProfiles.rows.slice(0, 5).forEach((row: any) => {
+        console.log(`  - Wallet row: user_id=${row.user_id}, wallet_address=${row.wallet_address}`);
+      });
       
       // Also get users with profiles but no wallets (for completeness)
       const profilesWithoutWallets = await db.query(`
@@ -153,12 +157,14 @@ app.get('/api/users', async (req, res) => {
       const discordName = await getDiscordUsername(row.user_id);
       
       // Get wallet address from the result
-      let walletAddress = row.wallet_address || null;
-      
-      // Debug logging for wallets
-      if (walletAddress) {
-        console.log(`  - User ${row.user_id} has wallet: ${walletAddress}`);
+      // Handle both null and empty string cases
+      let walletAddress = row.wallet_address;
+      if (walletAddress === '' || walletAddress === null || walletAddress === undefined) {
+        walletAddress = null;
       }
+      
+      // Debug logging for all users
+      console.log(`  - User ${row.user_id} (${discordName}): wallet = ${walletAddress || 'null'}`);
 
       return {
         discordId: row.user_id,
