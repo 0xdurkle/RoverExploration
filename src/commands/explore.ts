@@ -51,12 +51,27 @@ export async function handleExploreCommand(interaction: ChatInputCommandInteract
     const userId = interaction.user.id;
     console.log(`🌍 [EXPLORE] User ${userId} starting exploration`);
     
+    // Validate that this is the correct command format (dropdown menus, not buttons)
+    // Log all options to help debug any command registration issues
+    const allOptions = interaction.options.data;
+    console.log(`🌍 [EXPLORE] Command options received:`, allOptions.map(o => ({ name: o.name, type: o.type, value: o.value })));
+    
     // Defer reply immediately (ephemeral for user confirmation)
     await safeDeferReply(interaction, { ephemeral: true });
     
     // Get options (with defensive checks)
     const biomeOption = interaction.options.get('biome');
     const durationOption = interaction.options.get('duration');
+    
+    // CRITICAL: Ensure both required options exist - if not, this is an old command format
+    if (!biomeOption || !durationOption) {
+      console.error(`🌍 [EXPLORE] ❌ Invalid command format detected - missing required options. This suggests Discord is serving an old cached command.`);
+      console.error(`🌍 [EXPLORE] Received options:`, allOptions);
+      await safeEditReply(interaction, {
+        content: '❌ **Command Format Error**: The `/explore` command format appears to be outdated. Please wait a moment and try again, or contact an admin. The command should have dropdown menus for biome and duration selection.',
+      });
+      return;
+    }
     
     if (!biomeOption) {
       console.error(`🌍 [EXPLORE] ❌ Biome option not found. Available options:`, interaction.options.data.map(o => o.name));
