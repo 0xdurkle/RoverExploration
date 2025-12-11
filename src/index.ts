@@ -2,14 +2,9 @@ import { Client, GatewayIntentBits, Collection, Events } from 'discord.js';
 import { config } from 'dotenv';
 import * as cron from 'node-cron';
 import { initDatabase, closeDatabase } from './db/connection';
-import { handleExploreCommand, getExploreCommandBuilder } from './commands/explore';
-import { handleWalletSet, handleWalletView, getWalletCommandBuilder } from './commands/wallet';
-import { handleInventoryCommand, getInventoryCommandBuilder } from './commands/inventory';
-import { handlePartyCreate, getPartyCommandBuilder } from './commands/party';
-import { handleEndAllCommand, getEndAllCommandBuilder } from './commands/endAll';
-import { handleHowCommand, getHowCommandBuilder } from './commands/how';
-import { handlePartyJoin } from './handlers/partyJoin';
-import { handleHowNavigation } from './handlers/howNavigation';
+import { handleExploreCommand } from './commands/explore';
+import { handleBiomeSelect } from './handlers/biomeSelect';
+import { handleDurationSelect } from './handlers/durationSelect';
 import { checkAndProcessExplorations } from './jobs/checkExplorations';
 
 // Load environment variables
@@ -44,12 +39,10 @@ client.once(Events.ClientReady, async (readyClient) => {
     }
 
     const commands = [
-      getExploreCommandBuilder().toJSON(),
-      getWalletCommandBuilder().toJSON(),
-      getInventoryCommandBuilder().toJSON(),
-      getPartyCommandBuilder().toJSON(),
-      getEndAllCommandBuilder().toJSON(),
-      getHowCommandBuilder().toJSON(),
+      {
+        name: 'explore',
+        description: 'Start an exploration expedition in a biome',
+      },
     ];
 
     if (guildId) {
@@ -66,123 +59,28 @@ client.once(Events.ClientReady, async (readyClient) => {
     console.error('❌ Error registering commands:', error);
   }
 
-  // Start frequent check job (every 10 seconds for near real-time results)
-  cron.schedule('*/10 * * * * *', () => {
+  // Start cron job to check completed explorations every 2 minutes
+  cron.schedule('*/2 * * * *', () => {
     checkAndProcessExplorations(client).catch((error) => {
       console.error('❌ Error in exploration check job:', error);
     });
   });
 
-  console.log('✅ Exploration checker started (checking every 10 seconds)');
+  console.log('✅ Cron job started (checking every 2 minutes)');
 });
 
-// Track processed interactions to prevent duplicate processing
-// Use Set for simple, reliable deduplication
-const processedInteractions = new Set<string>();
-const PROCESSED_CLEANUP_INTERVAL = 60000; // Clean up after 1 minute
-
-// Track if interaction handler is already registered to prevent duplicate registrations
-let interactionHandlerRegistered = false;
-
-// Clean up old interaction IDs periodically
-setInterval(() => {
-  const before = processedInteractions.size;
-  // Keep only recent interactions (this is just for memory management)
-  if (processedInteractions.size > 1000) {
-    processedInteractions.clear();
-    console.log(`🧹 [INTERACTION] Cleared processed interactions cache (had ${before} entries)`);
-  }
-}, PROCESSED_CLEANUP_INTERVAL);
-
-// Handle slash commands and button interactions
-// Only register once to prevent duplicate event handlers
-// Note: Only party_join buttons are handled; explore uses slash command options
-if (!interactionHandlerRegistered) {
-  interactionHandlerRegistered = true;
-  console.log('✅ [INTERACTION] Registering interaction handler (single registration)');
-  
-  client.on(Events.InteractionCreate, async (interaction) => {
-  // CRITICAL: Prevent duplicate processing of the same interaction
-  // Discord may send the same interaction event multiple times
-  // Check and mark as processed atomically
-  if (processedInteractions.has(interaction.id)) {
-    console.log(`⚠️ [INTERACTION] Interaction ${interaction.id} already processed, ignoring duplicate event`);
-    return;
-  }
-  
-  // Mark as processed immediately to prevent race conditions
-  processedInteractions.add(interaction.id);
-  
-  // Add error handling wrapper
-  try {
-    // Log all interactions for debugging
-    if (interaction.isButton()) {
-      console.log(`🔘 [INTERACTION] Button interaction: ${interaction.customId}, User: ${interaction.user.id}, Deferred: ${interaction.deferred}, Replied: ${interaction.replied}`);
-    } else if (interaction.isChatInputCommand()) {
-      console.log(`💬 [INTERACTION] Command: ${interaction.commandName}, User: ${interaction.user.id}`);
+// Handle slash commands
+client.on(Events.InteractionCreate, async (interaction) => {
+  if (interaction.isChatInputCommand()) {
+    if (interaction.commandName === 'explore') {
+      await handleExploreCommand(interaction);
     }
-
-    if (interaction.isChatInputCommand()) {
-      if (interaction.commandName === 'explore') {
-        await handleExploreCommand(interaction);
-      } else if (interaction.commandName === 'wallet') {
-        const subcommand = interaction.options.getSubcommand();
-        if (subcommand === 'set') {
-          const address = interaction.options.getString('address', true);
-          await handleWalletSet(interaction, address);
-        } else if (subcommand === 'view') {
-          await handleWalletView(interaction);
-        }
-      } else if (interaction.commandName === 'inventory') {
-        await handleInventoryCommand(interaction);
-      } else if (interaction.commandName === 'party') {
-        const subcommand = interaction.options.getSubcommand();
-        if (subcommand === 'create') {
-          await handlePartyCreate(interaction);
-        }
-      } else if (interaction.commandName === 'endall') {
-        await handleEndAllCommand(interaction);
-      } else if (interaction.commandName === 'how') {
-        await handleHowCommand(interaction);
-      }
-    } else if (interaction.isButton()) {
-      if (interaction.customId.startsWith('party_join_')) {
-        await handlePartyJoin(interaction);
-      } else if (interaction.customId.startsWith('how_nav_')) {
-        await handleHowNavigation(interaction);
-      }
+  } else if (interaction.isButton()) {
+    if (interaction.customId.startsWith('biome_')) {
+      await handleBiomeSelect(interaction);
+    } else if (interaction.customId.startsWith('duration_')) {
+      await handleDurationSelect(interaction);
     }
-  } catch (error) {
-    console.error(`❌ [INTERACTION] Unhandled error in interaction handler:`, error);
-    console.error(`❌ [INTERACTION] Error stack:`, error instanceof Error ? error.stack : String(error));
-    
-    // Try to respond to the interaction if it's still valid
-    try {
-      if (interaction.isButton() && !interaction.replied && !interaction.deferred) {
-        await interaction.deferUpdate().catch(() => {});
-      } else if (interaction.isChatInputCommand() && !interaction.replied && !interaction.deferred) {
-        await interaction.deferReply({ ephemeral: true }).catch(() => {});
-        await interaction.editReply({ content: '❌ An error occurred. Please try again.' }).catch(() => {});
-      }
-    } catch (responseError) {
-      console.error(`❌ [INTERACTION] Failed to send error response:`, responseError);
-    }
-  }
-  // Note: We don't remove from processedInteractions here because we want to prevent
-  // the same interaction ID from being processed again even after completion
-  });
-} else {
-  console.warn('⚠️ [INTERACTION] Interaction handler already registered, skipping duplicate registration');
-}
-
-// Handle !roverswill message command
-client.on(Events.MessageCreate, async (message) => {
-  // Ignore bot messages
-  if (message.author.bot) return;
-  
-  // Check if message starts with !roverswill
-  if (message.content.toLowerCase().trim() === '!roverswill') {
-    await message.channel.send('save us');
   }
 });
 
@@ -191,24 +89,19 @@ client.on(Events.Error, (error) => {
   console.error('❌ Discord client error:', error);
 });
 
-/**
- * Graceful shutdown handler
- */
-async function shutdown(signal: string): Promise<void> {
-  console.log(`\n🛑 Received ${signal}, shutting down gracefully...`);
-  try {
-    await closeDatabase();
-    client.destroy();
-    console.log('✅ Shutdown complete');
-    process.exit(0);
-  } catch (error) {
-    console.error('❌ Error during shutdown:', error);
-    process.exit(1);
-  }
-}
+process.on('SIGINT', async () => {
+  console.log('\n🛑 Shutting down...');
+  await closeDatabase();
+  client.destroy();
+  process.exit(0);
+});
 
-process.on('SIGINT', () => shutdown('SIGINT'));
-process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGTERM', async () => {
+  console.log('\n🛑 Shutting down...');
+  await closeDatabase();
+  client.destroy();
+  process.exit(0);
+});
 
 // Login
 const token = process.env.DISCORD_BOT_TOKEN;

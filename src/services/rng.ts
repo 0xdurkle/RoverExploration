@@ -1,10 +1,4 @@
 import biomesData from '../data/biomes.json';
-import {
-  DURATION_30_SECONDS_HOURS,
-  FLOAT_COMPARISON_TOLERANCE,
-  RARITY_ORDER,
-  TEST_PROBABILITIES,
-} from '../constants';
 
 interface Biome {
   id: string;
@@ -14,7 +8,7 @@ interface Biome {
 
 interface Item {
   name: string;
-  rarity: 'uncommon' | 'rare' | 'legendary' | 'epic';
+  rarity: 'uncommon' | 'rare' | 'legendary';
   baseProbability: number;
 }
 
@@ -30,39 +24,27 @@ interface Duration {
  */
 export function discoverItem(biomeId: string, durationHours: number): {
   name: string;
-  rarity: 'uncommon' | 'rare' | 'legendary' | 'epic';
+  rarity: 'uncommon' | 'rare' | 'legendary';
 } | null {
   const biome = (biomesData.biomes as Biome[]).find(b => b.id === biomeId);
   if (!biome) {
     throw new Error(`Biome ${biomeId} not found`);
   }
 
-  // Check if this is a 30-second exploration (for testing with special probabilities)
-  const is30Second = Math.abs(durationHours - DURATION_30_SECONDS_HOURS) < FLOAT_COMPARISON_TOLERANCE;
+  const duration = (biomesData.durations as Duration[]).find(d => d.hours === durationHours);
+  if (!duration) {
+    throw new Error(`Duration ${durationHours} hours not found`);
+  }
 
   // Sort items by rarity (legendary first, then rare, then uncommon)
   const sortedItems = [...biome.items].sort((a, b) => {
-    return RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity];
+    const rarityOrder = { legendary: 0, rare: 1, uncommon: 2 };
+    return rarityOrder[a.rarity] - rarityOrder[b.rarity];
   });
 
   // Check each item in order (rarest first)
   for (const item of sortedItems) {
-    let adjustedProbability: number;
-    
-    if (is30Second) {
-      // Use special test probabilities for 30-second explorations
-      adjustedProbability = TEST_PROBABILITIES[item.rarity];
-    } else {
-      // Use normal multiplier system for other durations
-      const duration = (biomesData.durations as Duration[]).find(d => 
-        Math.abs(d.hours - durationHours) < FLOAT_COMPARISON_TOLERANCE
-      );
-      if (!duration) {
-        throw new Error(`Duration ${durationHours} hours not found`);
-      }
-      adjustedProbability = item.baseProbability * duration.multiplier;
-    }
-    
+    const adjustedProbability = item.baseProbability * duration.multiplier;
     const roll = Math.random();
 
     if (roll < adjustedProbability) {
@@ -95,10 +77,7 @@ export function getAllBiomes(): Biome[] {
  * Get duration multiplier
  */
 export function getDurationMultiplier(durationHours: number): number {
-  // Find duration (use approximate match for floating point comparison)
-  const duration = (biomesData.durations as Duration[]).find(d => 
-    Math.abs(d.hours - durationHours) < FLOAT_COMPARISON_TOLERANCE
-  );
+  const duration = (biomesData.durations as Duration[]).find(d => d.hours === durationHours);
   return duration?.multiplier || 1.0;
 }
 

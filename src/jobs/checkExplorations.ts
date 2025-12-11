@@ -3,7 +3,6 @@ import { getCompletedExplorations, Exploration } from '../db/models';
 import { finishExploration } from '../services/explorationService';
 import { getRarityEmoji } from '../services/rng';
 import { getBiome } from '../services/rng';
-import { getReturnWithItemMessage, getReturnEmptyMessage } from '../utils/messageVariations';
 
 /**
  * Check for completed explorations and post results
@@ -11,217 +10,152 @@ import { getReturnWithItemMessage, getReturnEmptyMessage } from '../utils/messag
  */
 export async function checkAndProcessExplorations(client: Client): Promise<void> {
   try {
-    console.log(`\n🔄 [CHECK_EXPLORATIONS] ==========================================`);
-    console.log(`🔄 [CHECK_EXPLORATIONS] Starting check for completed explorations...`);
     const completed = await getCompletedExplorations();
-    console.log(`🔄 [CHECK_EXPLORATIONS] Found ${completed.length} completed exploration(s)`);
 
     if (completed.length === 0) {
-      console.log(`🔄 [CHECK_EXPLORATIONS] No completed explorations, exiting`);
       return; // No completed explorations
     }
 
-    completed.forEach((exp, idx) => {
-      console.log(`🔄 [CHECK_EXPLORATIONS] Exploration ${idx + 1}: ID=${exp.id}, User=${exp.user_id}, Biome=${exp.biome}, EndsAt=${exp.ends_at}`);
-    });
-
     const channelId = process.env.DISCORD_CHANNEL_ID;
     if (!channelId) {
-      console.error('🔄 [CHECK_EXPLORATIONS] ❌ DISCORD_CHANNEL_ID not set');
+      console.error('❌ DISCORD_CHANNEL_ID not set');
       return;
     }
 
     const channel = (await client.channels.fetch(channelId)) as TextChannel;
     if (!channel) {
-      console.error(`🔄 [CHECK_EXPLORATIONS] ❌ Channel ${channelId} not found`);
+      console.error(`❌ Channel ${channelId} not found`);
       return;
     }
-    console.log(`🔄 [CHECK_EXPLORATIONS] ✅ Channel found: ${channelId}`);
 
-    // Process each completed exploration
+    // Finish all explorations first and collect results
+    const explorationResults = new Map<number, { exploration: Exploration; itemFound: Awaited<ReturnType<typeof finishExploration>> }>();
+    
     for (const exploration of completed) {
-      await processExploration(exploration, channel);
+      const itemFound = await finishExploration(
+        exploration.id,
+        exploration.user_id,
+        exploration.biome,
+        exploration.duration_hours
+      );
+      explorationResults.set(exploration.id, { exploration, itemFound });
     }
 
-    console.log(`🔄 [CHECK_EXPLORATIONS] ✅ Processed ${completed.length} completed exploration(s)`);
-    console.log(`🔄 [CHECK_EXPLORATIONS] ==========================================\n`);
+    // Group explorations by biome and item
+    const grouped = new Map<string, { 
+      explorations: Exploration[]; 
+      biome: string; 
+      itemName: string | null; 
+      itemRarity: 'uncommon' | 'rare' | 'legendary' | null 
+    }>();
+    
+    for (const { exploration, itemFound } of explorationResults.values()) {
+      const biome = getBiome(exploration.biome);
+      const biomeName = biome?.name || exploration.biome;
+      const key = `${biomeName}|${itemFound?.name || 'empty'}`;
+      
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          explorations: [],
+          biome: biomeName,
+          itemName: itemFound?.name || null,
+          itemRarity: itemFound?.rarity || null,
+        });
+      }
+      
+      grouped.get(key)!.explorations.push(exploration);
+    }
+
+    // Process grouped explorations
+    for (const group of grouped.values()) {
+      await processGroupedExplorations(group, channel);
+    }
+
+    console.log(`✅ Processed ${completed.length} completed exploration(s)`);
   } catch (error) {
-    console.error('🔄 [CHECK_EXPLORATIONS] ❌ Error checking explorations:', error);
-    console.error('🔄 [CHECK_EXPLORATIONS] Error stack:', error instanceof Error ? error.stack : String(error));
+    console.error('❌ Error checking explorations:', error);
   }
 }
 
 /**
- * Process a single completed exploration
+ * Process grouped explorations (multiple users finding the same item)
+ */
+async function processGroupedExplorations(
+  group: { 
+    explorations: Exploration[]; 
+    biome: string; 
+    itemName: string | null; 
+    itemRarity: 'uncommon' | 'rare' | 'legendary' | null 
+  },
+  channel: TextChannel
+): Promise<void> {
+  try {
+    // Get user mentions
+    const userMentions = await Promise.all(
+      group.explorations.map(async (exploration) => {
+        try {
+          const user = await channel.client.users.fetch(exploration.user_id);
+          return user ? `<@${exploration.user_id}>` : `User ${exploration.user_id}`;
+        } catch {
+          return `User ${exploration.user_id}`;
+        }
+      })
+    );
+
+    const usersText = userMentions.join(' ');
+
+    // Post result message
+    if (group.itemName && group.itemRarity) {
+      // Use the actual item rarity from the group (which comes from the item found)
+      const emoji = getRarityEmoji(group.itemRarity);
+      const verb = group.explorations.length === 1 ? 'returns' : 'return';
+      await channel.send(
+        `${emoji} ${usersText} ${verb} from the **${group.biome}** and discovered the **${group.itemName}** (${group.itemRarity})!`
+      );
+    } else {
+      // Empty-handed
+      const verb = group.explorations.length === 1 ? 'returns' : 'return';
+      await channel.send(
+        `🟤 ${usersText} ${verb} from the **${group.biome}** empty-handed.`
+      );
+    }
+  } catch (error) {
+    console.error(`❌ Error processing grouped explorations:`, error);
+  }
+}
+
+/**
+ * Process a single completed exploration (kept for backward compatibility, but not currently used)
  */
 async function processExploration(exploration: Exploration, channel: TextChannel): Promise<void> {
   try {
-    console.log(`\n🔄 [PROCESS_EXPLORATION] ==========================================`);
-    console.log(`🔄 [PROCESS_EXPLORATION] Starting for exploration ${exploration.id}`);
-    console.log(`🔄 [PROCESS_EXPLORATION] User ID: ${exploration.user_id}`);
-    console.log(`🔄 [PROCESS_EXPLORATION] Biome: ${exploration.biome}`);
-    console.log(`🔄 [PROCESS_EXPLORATION] Duration: ${exploration.duration_hours} hours`);
-    console.log(`🔄 [PROCESS_EXPLORATION] Ends at: ${exploration.ends_at}`);
-    console.log(`🔄 [PROCESS_EXPLORATION] Already completed: ${exploration.completed}`);
-    
-    // CRITICAL: Check if already completed - if so, skip processing
-    if (exploration.completed) {
-      console.log(`🔄 [PROCESS_EXPLORATION] ⚠️ Exploration ${exploration.id} is already completed, skipping`);
-      return;
-    }
-    
     const biome = getBiome(exploration.biome);
     const biomeName = biome?.name || exploration.biome;
-    console.log(`🔄 [PROCESS_EXPLORATION] Biome name: ${biomeName}`);
 
     // Finish exploration and determine item found
-    console.log(`🔄 [PROCESS_EXPLORATION] Calling finishExploration...`);
     const itemFound = await finishExploration(
       exploration.id,
       exploration.user_id,
       exploration.biome,
       exploration.duration_hours
     );
-    console.log(`🔄 [PROCESS_EXPLORATION] ✅ finishExploration completed`);
-    console.log(`🔄 [PROCESS_EXPLORATION] itemFound:`, itemFound ? `${itemFound.name} (${itemFound.rarity})` : 'null');
-    if (itemFound) {
-      console.log(`🔄 [PROCESS_EXPLORATION] Item details:`, JSON.stringify(itemFound, null, 2));
-    }
-
-    // CRITICAL: Verify item was saved to user profile BEFORE sending Discord message
-    if (itemFound) {
-      console.log(`🔄 [PROCESS_EXPLORATION] Verifying item was saved...`);
-      const { getDb } = await import('../db/connection');
-      const db = getDb();
-      
-      // Verify item is in explorations table
-      console.log(`🔄 [PROCESS_EXPLORATION] Checking explorations table...`);
-      const verifyExploration = await db.query(
-        `SELECT item_found, completed FROM explorations WHERE id = $1`,
-        [exploration.id]
-      );
-      console.log(`🔄 [PROCESS_EXPLORATION] Exploration query result:`, {
-        found: verifyExploration.rows.length > 0,
-        completed: verifyExploration.rows[0]?.completed,
-        hasItem: !!verifyExploration.rows[0]?.item_found
-      });
-      
-      if (!verifyExploration.rows[0] || !verifyExploration.rows[0].completed) {
-        console.error(`🔄 [PROCESS_EXPLORATION] ❌ CRITICAL: Exploration ${exploration.id} was not marked as completed!`);
-        throw new Error(`Exploration ${exploration.id} was not properly completed`);
-      }
-      
-      const savedItem = verifyExploration.rows[0].item_found;
-      if (!savedItem) {
-        console.error(`🔄 [PROCESS_EXPLORATION] ❌ CRITICAL: Item was discovered but NOT saved in explorations table!`);
-        throw new Error(`Item was not saved to explorations table for exploration ${exploration.id}`);
-      }
-      
-      const itemData = typeof savedItem === 'string' ? JSON.parse(savedItem) : savedItem;
-      console.log(`🔄 [PROCESS_EXPLORATION] ✅ Verified: Item saved in explorations table: ${itemData.name}`);
-      
-      // CRITICAL: Verify item is in user profile inventory
-      console.log(`🔄 [PROCESS_EXPLORATION] Checking user profile inventory...`);
-      const verifyProfile = await db.query(
-        `SELECT items_found, total_explorations FROM user_profiles WHERE user_id = $1`,
-        [exploration.user_id]
-      );
-      console.log(`🔄 [PROCESS_EXPLORATION] Profile query result:`, {
-        found: verifyProfile.rows.length > 0,
-        totalExplorations: verifyProfile.rows[0]?.total_explorations,
-        itemsCount: Array.isArray(verifyProfile.rows[0]?.items_found) ? verifyProfile.rows[0].items_found.length : 'N/A'
-      });
-      
-      if (!verifyProfile.rows[0]) {
-        console.error(`🔄 [PROCESS_EXPLORATION] ❌ CRITICAL: User profile not found for user ${exploration.user_id}!`);
-        throw new Error(`User profile not found for user ${exploration.user_id}`);
-      }
-      
-      const savedItems = verifyProfile.rows[0].items_found;
-      const itemsArray = Array.isArray(savedItems) ? savedItems : [];
-      console.log(`🔄 [PROCESS_EXPLORATION] User has ${itemsArray.length} items in inventory`);
-      console.log(`🔄 [PROCESS_EXPLORATION] Looking for item: name="${itemFound.name}", rarity="${itemFound.rarity}"`);
-      
-      const itemExists = itemsArray.some((item: any) => {
-        const matches = item && item.name === itemFound.name && item.rarity === itemFound.rarity;
-        if (matches) {
-          console.log(`🔄 [PROCESS_EXPLORATION] Found matching item:`, JSON.stringify(item, null, 2));
-        }
-        return matches;
-      });
-      
-      if (!itemExists) {
-        console.error(`🔄 [PROCESS_EXPLORATION] ❌ CRITICAL: Item "${itemFound.name}" was NOT saved to user ${exploration.user_id}'s inventory!`);
-        console.error(`🔄 [PROCESS_EXPLORATION] User has ${itemsArray.length} items in inventory, but "${itemFound.name}" is missing!`);
-        console.error(`🔄 [PROCESS_EXPLORATION] All items in inventory:`, JSON.stringify(itemsArray, null, 2));
-        throw new Error(`Item "${itemFound.name}" was not saved to user profile inventory`);
-      }
-      
-      console.log(`🔄 [PROCESS_EXPLORATION] ✅ Verified: Item "${itemFound.name}" is in user ${exploration.user_id}'s inventory`);
-    } else {
-      console.log(`🔄 [PROCESS_EXPLORATION] No item found, skipping verification`);
-    }
 
     // Get user mention
     const user = await channel.client.users.fetch(exploration.user_id);
     const userMention = user ? `<@${exploration.user_id}>` : `User ${exploration.user_id}`;
 
-    // Post result message (only after verification)
+    // Post result message
     if (itemFound) {
-      console.log(`🔄 [PROCESS_EXPLORATION] Sending Discord message for item...`);
       const emoji = getRarityEmoji(itemFound.rarity);
-      const message = getReturnWithItemMessage(
-        emoji,
-        userMention,
-        `**${biomeName}**`,
-        `**${itemFound.name}**`,
-        itemFound.rarity
+      await channel.send(
+        `${emoji} ${userMention} returns from the **${biomeName}** and discovered the **${itemFound.name}** (${itemFound.rarity})!`
       );
-      await channel.send(message);
-      console.log(`🔄 [PROCESS_EXPLORATION] ✅ Sent Discord message for item: ${itemFound.name} (${itemFound.rarity})`);
     } else {
-      console.log(`🔄 [PROCESS_EXPLORATION] Sending Discord message: no item found...`);
-      const message = getReturnEmptyMessage(userMention, `**${biomeName}**`);
-      await channel.send(message);
-      console.log(`🔄 [PROCESS_EXPLORATION] ✅ Sent Discord message: no item found`);
-    }
-    console.log(`🔄 [PROCESS_EXPLORATION] ==========================================\n`);
-  } catch (error) {
-    console.error(`🔄 [PROCESS_EXPLORATION] ❌ Error processing exploration ${exploration.id}:`, error);
-    console.error(`🔄 [PROCESS_EXPLORATION] Error type:`, error instanceof Error ? error.constructor.name : typeof error);
-    console.error(`🔄 [PROCESS_EXPLORATION] Error stack:`, error instanceof Error ? error.stack : String(error));
-    
-    // Check if exploration was already completed (common case - don't spam errors)
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    if (errorMessage.includes('already completed') || errorMessage.includes('already has an item')) {
-      console.log(`🔄 [PROCESS_EXPLORATION] ⚠️ Exploration was already processed, skipping error message`);
-      return; // Don't send error message for already-completed explorations
-    }
-    
-    // Only send error message for actual errors (not already-completed cases)
-    // Limit to one error message per exploration to prevent spam
-    try {
-      const { getDb } = await import('../db/connection');
-      const db = getDb();
-      const checkCompleted = await db.query(
-        `SELECT completed FROM explorations WHERE id = $1`,
-        [exploration.id]
+      await channel.send(
+        `🟤 ${userMention} returns from the **${biomeName}** empty-handed.`
       );
-      
-      // If already completed, don't send error message
-      if (checkCompleted.rows[0]?.completed) {
-        console.log(`🔄 [PROCESS_EXPLORATION] Exploration ${exploration.id} is now completed, skipping error message`);
-        return;
-      }
-      
-      // Only send error if exploration is still not completed
-      const user = await channel.client.users.fetch(exploration.user_id);
-      const userMention = user ? `<@${exploration.user_id}>` : `User ${exploration.user_id}`;
-      await channel.send(`❌ An error occurred processing ${userMention}'s exploration. Please try again.`);
-      console.log(`🔄 [PROCESS_EXPLORATION] Sent error message to user`);
-    } catch (sendError) {
-      console.error(`🔄 [PROCESS_EXPLORATION] ❌ Failed to send error message:`, sendError);
     }
-    console.log(`🔄 [PROCESS_EXPLORATION] ==========================================\n`);
+  } catch (error) {
+    console.error(`❌ Error processing exploration ${exploration.id}:`, error);
   }
 }
