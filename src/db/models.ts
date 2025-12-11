@@ -209,21 +209,40 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
 }
 
 /**
- * Save or update a user's wallet address
+ * Save a user's wallet address (INSERT only - no updates allowed)
+ * Throws error if wallet already exists for this user
  */
 export async function saveUserWallet(discordId: string, walletAddress: string): Promise<UserWallet> {
   const db = getDb();
 
+  // Check if wallet already exists
+  const existing = await getUserWallet(discordId);
+  if (existing) {
+    throw new Error('Wallet already exists for this user. Contact an admin to reset it.');
+  }
+
   const result = await db.query(
     `INSERT INTO user_wallets (discord_id, wallet_address, updated_at)
      VALUES ($1, $2, NOW())
-     ON CONFLICT (discord_id) 
-     DO UPDATE SET wallet_address = $2, updated_at = NOW()
      RETURNING *`,
     [discordId, walletAddress]
   );
 
   return result.rows[0];
+}
+
+/**
+ * Delete a user's wallet address (admin only)
+ */
+export async function deleteUserWallet(discordId: string): Promise<boolean> {
+  const db = getDb();
+
+  const result = await db.query(
+    `DELETE FROM user_wallets WHERE discord_id = $1`,
+    [discordId]
+  );
+
+  return (result.rowCount ?? 0) > 0;
 }
 
 /**

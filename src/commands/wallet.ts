@@ -1,6 +1,7 @@
 import { ChatInputCommandInteraction, SlashCommandBuilder, SlashCommandSubcommandsOnlyBuilder } from 'discord.js';
 import { ethers } from 'ethers';
-import { saveUserWallet, getUserWallet, getUserWalletByAddress } from '../db/models';
+import { saveUserWallet, getUserWallet, getUserWalletByAddress, deleteUserWallet } from '../db/models';
+import { isAdmin } from '../utils/adminHelpers';
 
 /**
  * Handle /wallet set command
@@ -12,6 +13,15 @@ export async function handleWalletSet(
   await interaction.deferReply({ ephemeral: true });
 
   try {
+    // Check if user already has a wallet
+    const existingWallet = await getUserWallet(interaction.user.id);
+    if (existingWallet) {
+      await interaction.editReply({
+        content: `❌ You already have a wallet linked: \`${existingWallet.wallet_address}\`\n\nOnce a wallet is set, it cannot be changed. Contact an admin if you need to reset your wallet.`,
+      });
+      return;
+    }
+
     // Validate Ethereum address
     if (!ethers.isAddress(address)) {
       await interaction.editReply({
@@ -24,28 +34,43 @@ export async function handleWalletSet(
     const checksumAddress = ethers.getAddress(address);
 
     // Check if this wallet is already linked to a different Discord account
-    const existingWallet = await getUserWalletByAddress(checksumAddress);
-    if (existingWallet && existingWallet.discord_id !== interaction.user.id) {
+    const walletByAddress = await getUserWalletByAddress(checksumAddress);
+    if (walletByAddress && walletByAddress.discord_id !== interaction.user.id) {
       await interaction.editReply({
         content: '❌ This wallet address is already linked to another Discord account. Each wallet can only be linked to one account.',
       });
       return;
     }
 
-    // Save to database
+    // Save to database (INSERT only, no updates)
     await saveUserWallet(interaction.user.id, checksumAddress);
 
     // Reply with confirmation
     await interaction.editReply({
-      content: `🔗 Your airdrop address has been updated to \`${checksumAddress}\`\n\nThis will be used for future reward drops.`,
+      content: `🔗 Your airdrop address has been set to \`${checksumAddress}\`\n\nThis will be used for future reward drops.\n\n⚠️ **Note:** Your wallet can only be set once. Contact an admin if you need to change it.`,
     });
   } catch (error: any) {
     console.error('Error saving wallet:', error);
     
     // Check for unique constraint violation (wallet already linked to another account)
-    if (error.code === '23505' && error.constraint === 'user_wallets_wallet_address_unique') {
+    if (error.code === '23505') {
+      if (error.constraint === 'user_wallets_wallet_address_unique') {
+        await interaction.editReply({
+          content: '❌ This wallet address is already linked to another Discord account. Each wallet can only be linked to one account.',
+        });
+        return;
+      } else if (error.constraint === 'user_wallets_discord_id_unique') {
+        await interaction.editReply({
+          content: '❌ You already have a wallet linked. Contact an admin if you need to reset it.',
+        });
+        return;
+      }
+    }
+    
+    // Check for custom error from saveUserWallet
+    if (error.message && error.message.includes('already exists')) {
       await interaction.editReply({
-        content: '❌ This wallet address is already linked to another Discord account. Each wallet can only be linked to one account.',
+        content: '❌ You already have a wallet linked. Contact an admin if you need to reset it.',
       });
       return;
     }
@@ -94,6 +119,54 @@ export async function handleWalletView(interaction: ChatInputCommandInteraction)
 }
 
 /**
+ * Handle /wallet reset command (admin only)
+ */
+export async function handleWalletReset(interaction: ChatInputCommandInteraction): Promise<void> {
+  await interaction.deferReply({ ephemeral: true });
+
+  try {
+    // Check admin permissions
+    const admin = await isAdmin(interaction);
+    if (!admin) {
+      await interaction.editReply({
+        content: '❌ You do not have permission to use this command. This is an admin-only command.',
+      });
+      return;
+    }
+
+    const targetUser = interaction.options.getUser('user', true);
+    const targetUserId = targetUser.id;
+
+    // Get target user's wallet
+    const wallet = await getUserWallet(targetUserId);
+    if (!wallet) {
+      await interaction.editReply({
+        content: `❌ User <@${targetUserId}> does not have a wallet linked.`,
+      });
+      return;
+    }
+
+    // Delete the wallet
+    const deleted = await deleteUserWallet(targetUserId);
+    if (!deleted) {
+      await interaction.editReply({
+        content: '❌ Failed to reset wallet. Please try again.',
+      });
+      return;
+    }
+
+    await interaction.editReply({
+      content: `✅ Successfully reset wallet for <@${targetUserId}>.\n\nPrevious wallet: \`${wallet.wallet_address}\`\n\nThey can now set a new wallet using \`/wallet set\`.`,
+    });
+  } catch (error) {
+    console.error('Error resetting wallet:', error);
+    await interaction.editReply({
+      content: '❌ An error occurred while resetting the wallet. Please try again.',
+    });
+  }
+}
+
+/**
  * Get wallet command builder for registration
  */
 export function getWalletCommandBuilder(): SlashCommandSubcommandsOnlyBuilder {
@@ -113,6 +186,18 @@ export function getWalletCommandBuilder(): SlashCommandSubcommandsOnlyBuilder {
     )
     .addSubcommand((subcommand) =>
       subcommand.setName('view').setDescription('View your linked Ethereum wallet address')
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName('reset')
+        .setDescription('Reset a user\'s wallet address (admin only)')
+        .addUserOption((option) =>
+          option
+            .setName('user')
+            .setDescription('The user whose wallet should be reset')
+            .setRequired(true)
+        )
     );
 }
+
 
