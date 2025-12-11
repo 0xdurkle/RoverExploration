@@ -138,7 +138,7 @@ export async function handleExploreCommand(interaction: ChatInputCommandInteract
     
     // Then send public message to channel (not as a reply, standalone comment)
     const channel = interaction.channel;
-    if (channel && 'send' in channel && channel.isTextBased()) {
+    if (channel && channel.isTextBased() && !channel.isDMBased()) {
       await (channel as TextChannel).send(message);
     }
   } catch (error: any) {
