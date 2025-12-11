@@ -4,7 +4,9 @@ import * as cron from 'node-cron';
 import { initDatabase, closeDatabase } from './db/connection';
 import { handleExploreCommand } from './commands/explore';
 import { handleHowCommand } from './commands/how';
+import { handlePartyCreate, getPartyCommandBuilder } from './commands/party';
 import { handleHowNavigation } from './handlers/howNavigation';
+import { handlePartyJoin } from './handlers/partyJoin';
 import { checkAndProcessExplorations } from './jobs/checkExplorations';
 
 // Load environment variables
@@ -47,6 +49,7 @@ client.once(Events.ClientReady, async (readyClient) => {
         name: 'how',
         description: 'Show a field guide explaining how The Underlog works',
       },
+      getPartyCommandBuilder().toJSON(),
     ];
 
     if (guildId) {
@@ -80,10 +83,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await handleExploreCommand(interaction);
     } else if (interaction.commandName === 'how') {
       await handleHowCommand(interaction);
+    } else if (interaction.commandName === 'party') {
+      const subcommand = interaction.options.getSubcommand();
+      if (subcommand === 'create') {
+        await handlePartyCreate(interaction);
+      }
     }
   } else if (interaction.isButton()) {
     if (interaction.customId.startsWith('how_nav_')) {
       await handleHowNavigation(interaction);
+    } else if (interaction.customId.startsWith('party_join_')) {
+      await handlePartyJoin(interaction);
     }
   }
 });
