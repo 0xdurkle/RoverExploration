@@ -2,7 +2,7 @@ import { Client, GatewayIntentBits, Collection, Events } from 'discord.js';
 import { config } from 'dotenv';
 import * as cron from 'node-cron';
 import { initDatabase, closeDatabase } from './db/connection';
-import { handleExploreCommand } from './commands/explore';
+import { handleExploreCommand, getExploreCommandBuilder } from './commands/explore';
 import { handleHowCommand } from './commands/how';
 import { handlePartyCreate, getPartyCommandBuilder } from './commands/party';
 import { handleEndAllCommand, getEndAllCommandBuilder } from './commands/endAll';
@@ -43,10 +43,7 @@ client.once(Events.ClientReady, async (readyClient) => {
     }
 
     const commands = [
-      {
-        name: 'explore',
-        description: 'Start an exploration expedition in a biome',
-      },
+      getExploreCommandBuilder().toJSON(),
       {
         name: 'how',
         description: 'Show a field guide explaining how The Underlog works',

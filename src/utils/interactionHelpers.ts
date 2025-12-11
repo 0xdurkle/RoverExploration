@@ -2,7 +2,7 @@ import {
   ButtonInteraction, 
   ChatInputCommandInteraction, 
   Interaction,
-  RepliableInteraction 
+  RepliableInteraction
 } from 'discord.js';
 
 /**
@@ -40,7 +40,7 @@ export async function safeDeferUpdate(interaction: ButtonInteraction): Promise<b
  */
 export async function safeDeferReply(
   interaction: ChatInputCommandInteraction,
-  options?: { ephemeral?: boolean }
+  options?: { ephemeral?: boolean; flags?: number }
 ): Promise<boolean> {
   try {
     // Check if already handled
@@ -49,8 +49,17 @@ export async function safeDeferReply(
       return false;
     }
     
+    // Build options - use flags if provided, otherwise use ephemeral (convert to flags)
+    // Ephemeral flag value is 64 in Discord.js
+    const deferOptions: { flags?: number } = {};
+    if (options?.flags !== undefined) {
+      deferOptions.flags = options.flags;
+    } else if (options?.ephemeral) {
+      deferOptions.flags = 64; // Ephemeral flag
+    }
+    
     // Try to defer - this must happen within 3 seconds of interaction creation
-    await interaction.deferReply(options || { ephemeral: true });
+    await interaction.deferReply(Object.keys(deferOptions).length > 0 ? deferOptions : {});
     console.log(`✅ [INTERACTION] Successfully deferred reply for interaction ${interaction.id}`);
     return true;
   } catch (error: any) {
