@@ -27,6 +27,14 @@ export interface UserProfile {
   created_at: Date;
 }
 
+export interface UserWallet {
+  id: number;
+  discord_id: string;
+  wallet_address: string;
+  updated_at: Date;
+  created_at: Date;
+}
+
 /**
  * Create a new exploration session
  */
@@ -176,6 +184,52 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
     items_found: profile.items_found || [],
     last_exploration_end: profile.last_exploration_end || null,
   };
+}
+
+/**
+ * Save or update a user's wallet address
+ */
+export async function saveUserWallet(discordId: string, walletAddress: string): Promise<UserWallet> {
+  const db = getDb();
+
+  const result = await db.query(
+    `INSERT INTO user_wallets (discord_id, wallet_address, updated_at)
+     VALUES ($1, $2, NOW())
+     ON CONFLICT (discord_id) 
+     DO UPDATE SET wallet_address = $2, updated_at = NOW()
+     RETURNING *`,
+    [discordId, walletAddress]
+  );
+
+  return result.rows[0];
+}
+
+/**
+ * Get user's wallet address
+ */
+export async function getUserWallet(discordId: string): Promise<UserWallet | null> {
+  const db = getDb();
+
+  const result = await db.query(
+    `SELECT * FROM user_wallets WHERE discord_id = $1`,
+    [discordId]
+  );
+
+  return result.rows[0] || null;
+}
+
+/**
+ * Get wallet by address (to check if already linked)
+ */
+export async function getUserWalletByAddress(walletAddress: string): Promise<UserWallet | null> {
+  const db = getDb();
+
+  const result = await db.query(
+    `SELECT * FROM user_wallets WHERE wallet_address = $1`,
+    [walletAddress]
+  );
+
+  return result.rows[0] || null;
 }
 
 /**

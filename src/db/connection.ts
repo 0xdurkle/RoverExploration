@@ -85,6 +85,17 @@ async function createTables(): Promise<void> {
       )
     `);
 
+    // User wallets table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_wallets (
+        id SERIAL PRIMARY KEY,
+        discord_id VARCHAR(20) UNIQUE NOT NULL,
+        wallet_address VARCHAR(42) UNIQUE NOT NULL,
+        updated_at TIMESTAMP DEFAULT NOW(),
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
     // Create index for faster queries
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_explorations_ends_at 
