@@ -51,8 +51,8 @@ export async function handleExploreCommand(interaction: ChatInputCommandInteract
     const userId = interaction.user.id;
     console.log(`🌍 [EXPLORE] User ${userId} starting exploration`);
     
-    // Defer reply immediately (public message)
-    await safeDeferReply(interaction, { ephemeral: false });
+    // Defer reply immediately (ephemeral for user confirmation)
+    await safeDeferReply(interaction, { ephemeral: true });
     
     // Get options (with defensive checks)
     const biomeOption = interaction.options.get('biome');
@@ -131,10 +131,17 @@ export async function handleExploreCommand(interaction: ChatInputCommandInteract
     const userMention = `<@${userId}>`;
     const message = getExplorationStartMessage(userMention, biome.name, displayDuration);
     
-    // Send public confirmation message
+    // Send ephemeral confirmation to user first
     await safeEditReply(interaction, {
-      content: message,
+      content: '✅ Exploration started!',
+      ephemeral: true,
     });
+    
+    // Then send public message to channel (not as a reply)
+    const channel = interaction.channel;
+    if (channel && channel.isTextBased()) {
+      await channel.send(message);
+    }
   } catch (error: any) {
     console.error(`🌍 [EXPLORE] ❌ Error:`, error);
     console.error(`🌍 [EXPLORE] ❌ Error stack:`, error?.stack);
