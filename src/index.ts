@@ -6,6 +6,7 @@ import { handleExploreCommand } from './commands/explore';
 import { handleHowCommand } from './commands/how';
 import { handlePartyCreate, getPartyCommandBuilder } from './commands/party';
 import { handleEndAllCommand, getEndAllCommandBuilder } from './commands/endAll';
+import { handleInventoryCommand, getInventoryCommandBuilder } from './commands/inventory';
 import { handleHowNavigation } from './handlers/howNavigation';
 import { handlePartyJoin } from './handlers/partyJoin';
 import { checkAndProcessExplorations } from './jobs/checkExplorations';
@@ -50,6 +51,7 @@ client.once(Events.ClientReady, async (readyClient) => {
         name: 'how',
         description: 'Show a field guide explaining how The Underlog works',
       },
+      getInventoryCommandBuilder().toJSON(),
       getPartyCommandBuilder().toJSON(),
       getEndAllCommandBuilder().toJSON(),
     ];
@@ -85,6 +87,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await handleExploreCommand(interaction);
     } else if (interaction.commandName === 'how') {
       await handleHowCommand(interaction);
+    } else if (interaction.commandName === 'inventory') {
+      await handleInventoryCommand(interaction);
     } else if (interaction.commandName === 'party') {
       const subcommand = interaction.options.getSubcommand();
       if (subcommand === 'create') {
