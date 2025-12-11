@@ -92,12 +92,16 @@ app.get('/api/users', async (req, res) => {
       }
     }
     
-    // Get all users - start with wallets table as primary source to ensure all wallets are included
+    // Get all users with a FULL OUTER JOIN to include both profiles and wallets
     let allUsers: any[] = [];
     
     if (hasWalletsTable) {
-      // First, get all wallets with their profiles (if they exist)
-      const walletsWithProfiles = await db.query(`
+      // Use FULL OUTER JOIN to get all users from both tables
+      // This ensures we get:
+      // 1. Users with both profile and wallet
+      // 2. Users with wallet but no profile
+      // 3. Users with profile but no wallet
+      const allUsersResult = await db.query(`
         SELECT 
           COALESCE(up.user_id, uw.discord_id) as user_id,
           uw.wallet_address,
@@ -105,37 +109,20 @@ app.get('/api/users', async (req, res) => {
           COALESCE(up.items_found, '[]'::JSONB) as items_found,
           up.last_exploration_end,
           COALESCE(up.created_at, uw.created_at) as created_at
-        FROM user_wallets uw
-        LEFT JOIN user_profiles up ON uw.discord_id = up.user_id
+        FROM user_profiles up
+        FULL OUTER JOIN user_wallets uw ON up.user_id = uw.discord_id
         ORDER BY COALESCE(up.created_at, uw.created_at) DESC
       `);
       
-      console.log(`✅ Found ${walletsWithProfiles.rows.length} users with wallets`);
-      // Log first few wallets for debugging
-      walletsWithProfiles.rows.slice(0, 5).forEach((row: any) => {
-        console.log(`  - Wallet row: user_id=${row.user_id}, wallet_address=${row.wallet_address}`);
+      allUsers = allUsersResult.rows;
+      console.log(`✅ Found ${allUsers.length} total users (profiles + wallets combined)`);
+      
+      // Log wallet information
+      const usersWithWallets = allUsers.filter((u: any) => u.wallet_address);
+      console.log(`✅ Found ${usersWithWallets.length} users with wallets`);
+      usersWithWallets.slice(0, 5).forEach((row: any) => {
+        console.log(`  - User ${row.user_id}: wallet = ${row.wallet_address}`);
       });
-      
-      // Also get users with profiles but no wallets (for completeness)
-      const profilesWithoutWallets = await db.query(`
-        SELECT 
-          up.user_id,
-          NULL::VARCHAR as wallet_address,
-          up.total_explorations,
-          up.items_found,
-          up.last_exploration_end,
-          up.created_at
-        FROM user_profiles up
-        LEFT JOIN user_wallets uw ON up.user_id = uw.discord_id
-        WHERE uw.discord_id IS NULL
-        ORDER BY up.created_at DESC
-      `);
-      
-      console.log(`✅ Found ${profilesWithoutWallets.rows.length} users with profiles but no wallets`);
-      
-      // Combine both - wallets take priority (already included above)
-      // Add profiles without wallets
-      allUsers = [...walletsWithProfiles.rows, ...profilesWithoutWallets.rows];
     } else {
       // No wallets table, just get profiles
       const profilesResult = await db.query(`
