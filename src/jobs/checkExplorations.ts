@@ -7,7 +7,7 @@ import { getReturnWithItemMessage, getReturnEmptyMessage } from '../utils/messag
 
 /**
  * Check for completed explorations and post results
- * This runs as a cron job every 1-5 minutes
+ * This runs as a cron job every 10 seconds
  */
 export async function checkAndProcessExplorations(client: Client): Promise<void> {
   try {

@@ -85,21 +85,21 @@ client.once(Events.ClientReady, async (readyClient) => {
     console.error('❌ Error registering commands:', error);
   }
 
-  // Start cron job to check completed explorations every 30 seconds for faster response times
-  cron.schedule('*/30 * * * * *', () => {
+  // Start cron job to check completed explorations every 10 seconds for fastest response times
+  cron.schedule('*/10 * * * * *', () => {
     checkAndProcessExplorations(client).catch((error) => {
       console.error('❌ Error in exploration check job:', error);
     });
   });
 
-  // Start cron job to check completed party expeditions every 30 seconds
-  cron.schedule('*/30 * * * * *', () => {
+  // Start cron job to check completed party expeditions every 10 seconds
+  cron.schedule('*/10 * * * * *', () => {
     checkAndProcessPartyExplorations(client).catch((error) => {
       console.error('❌ Error in party exploration check job:', error);
     });
   });
 
-  console.log('✅ Cron jobs started (checking every 30 seconds)');
+  console.log('✅ Cron jobs started (checking every 10 seconds)');
 });
 
 // Handle slash commands and interactions

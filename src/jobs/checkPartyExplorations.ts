@@ -4,7 +4,7 @@ import { getReturnWithItemMessage, getReturnEmptyMessage } from '../utils/messag
 
 /**
  * Check for completed party expeditions and post results
- * This runs as a cron job every 30 seconds
+ * This runs as a cron job every 10 seconds
  */
 export async function checkAndProcessPartyExplorations(client: Client): Promise<void> {
   try {
