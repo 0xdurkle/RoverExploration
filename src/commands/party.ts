@@ -252,15 +252,9 @@ async function startPartyExpedition(client: any, partyId: string): Promise<void>
     // Store party completion data
     party.completed = false;
 
-    // Schedule completion check
-    const timeUntilCompletion = endsAt.getTime() - Date.now();
-    if (timeUntilCompletion > 0) {
-      setTimeout(async () => {
-        await completePartyExpedition(client, partyId);
-      }, timeUntilCompletion);
-    } else {
-      await completePartyExpedition(client, partyId);
-    }
+    // Party completion will be handled by cron job (checkPartyExplorations.ts)
+    // which runs every 30 seconds, so no need for setTimeout
+    // If expedition is already past end time, it will be picked up on next cron run
   } catch (error) {
     console.error(`Error starting party expedition ${partyId}:`, error);
   }

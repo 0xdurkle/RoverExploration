@@ -11,6 +11,7 @@ import { handleWalletSet, handleWalletView, getWalletCommandBuilder } from './co
 import { handleHowNavigation } from './handlers/howNavigation';
 import { handlePartyJoin } from './handlers/partyJoin';
 import { checkAndProcessExplorations } from './jobs/checkExplorations';
+import { checkAndProcessPartyExplorations } from './jobs/checkPartyExplorations';
 
 // Load environment variables
 config();
@@ -84,14 +85,21 @@ client.once(Events.ClientReady, async (readyClient) => {
     console.error('❌ Error registering commands:', error);
   }
 
-  // Start cron job to check completed explorations every 2 minutes
-  cron.schedule('*/2 * * * *', () => {
+  // Start cron job to check completed explorations every 30 seconds for faster response times
+  cron.schedule('*/30 * * * * *', () => {
     checkAndProcessExplorations(client).catch((error) => {
       console.error('❌ Error in exploration check job:', error);
     });
   });
 
-  console.log('✅ Cron job started (checking every 2 minutes)');
+  // Start cron job to check completed party expeditions every 30 seconds
+  cron.schedule('*/30 * * * * *', () => {
+    checkAndProcessPartyExplorations(client).catch((error) => {
+      console.error('❌ Error in party exploration check job:', error);
+    });
+  });
+
+  console.log('✅ Cron jobs started (checking every 30 seconds)');
 });
 
 // Handle slash commands and interactions

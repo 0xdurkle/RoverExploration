@@ -141,6 +141,13 @@ export function getExpiredParties(): Party[] {
 }
 
 /**
+ * Get all active parties (for cron job checking)
+ */
+export function getAllParties(): Party[] {
+  return Array.from(activeParties.values());
+}
+
+/**
  * Cleanup old completed parties (older than 1 hour)
  */
 export function cleanupOldParties(): void {
