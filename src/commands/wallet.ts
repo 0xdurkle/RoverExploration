@@ -119,29 +119,30 @@ export async function handleWalletView(interaction: ChatInputCommandInteraction)
 }
 
 /**
- * Handle /wallet reset command (admin only)
+ * Handle /wallet reset command
  */
 export async function handleWalletReset(interaction: ChatInputCommandInteraction): Promise<void> {
   await interaction.deferReply({ ephemeral: true });
 
   try {
-    // Check admin permissions
+    const targetUser = interaction.options.getUser('user', true);
+    const targetUserId = targetUser.id;
+    const requesterId = interaction.user.id;
+
+    // Users can only reset their own wallet (unless they're an admin)
     const admin = await isAdmin(interaction);
-    if (!admin) {
+    if (!admin && targetUserId !== requesterId) {
       await interaction.editReply({
-        content: '❌ You do not have permission to use this command. This is an admin-only command.',
+        content: '❌ You can only reset your own wallet. Use `/wallet reset` and select yourself.',
       });
       return;
     }
-
-    const targetUser = interaction.options.getUser('user', true);
-    const targetUserId = targetUser.id;
 
     // Get target user's wallet
     const wallet = await getUserWallet(targetUserId);
     if (!wallet) {
       await interaction.editReply({
-        content: `❌ User <@${targetUserId}> does not have a wallet linked.`,
+        content: `❌ ${targetUserId === requesterId ? 'You do not' : `User <@${targetUserId}> does not`} have a wallet linked.`,
       });
       return;
     }
@@ -155,9 +156,15 @@ export async function handleWalletReset(interaction: ChatInputCommandInteraction
       return;
     }
 
-    await interaction.editReply({
-      content: `✅ Successfully reset wallet for <@${targetUserId}>.\n\nPrevious wallet: \`${wallet.wallet_address}\`\n\nThey can now set a new wallet using \`/wallet set\`.`,
-    });
+    if (targetUserId === requesterId) {
+      await interaction.editReply({
+        content: `✅ Successfully reset your wallet.\n\nPrevious wallet: \`${wallet.wallet_address}\`\n\nYou can now set a new wallet using \`/wallet set\`.`,
+      });
+    } else {
+      await interaction.editReply({
+        content: `✅ Successfully reset wallet for <@${targetUserId}>.\n\nPrevious wallet: \`${wallet.wallet_address}\`\n\nThey can now set a new wallet using \`/wallet set\`.`,
+      });
+    }
   } catch (error) {
     console.error('Error resetting wallet:', error);
     await interaction.editReply({
@@ -190,11 +197,11 @@ export function getWalletCommandBuilder(): SlashCommandSubcommandsOnlyBuilder {
     .addSubcommand((subcommand) =>
       subcommand
         .setName('reset')
-        .setDescription('Reset a user\'s wallet address (admin only)')
+        .setDescription('Reset your wallet address (or another user\'s if you\'re an admin)')
         .addUserOption((option) =>
           option
             .setName('user')
-            .setDescription('The user whose wallet should be reset')
+            .setDescription('The user whose wallet should be reset (defaults to you)')
             .setRequired(true)
         )
     );
