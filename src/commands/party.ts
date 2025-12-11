@@ -156,12 +156,21 @@ async function startPartyExpedition(client: any, partyId: string): Promise<void>
     const channel = await client.channels.fetch(party.channelId);
     if (!channel || !channel.isTextBased()) return;
 
+    // Get party size (used throughout this function)
+    const partySize = party.joinedUsers.length;
+
     // Disable join button
+    let departureDescription: string;
+    
+    if (partySize === 1) {
+      departureDescription = `**Expedition has departed!**\n\n<@${party.joinedUsers[0].userId}> is exploring the **${party.biomeName}**.`;
+    } else {
+      departureDescription = `**Expedition has departed!**\n\n${party.joinedUsers.map((u) => `<@${u.userId}>`).join(' ')} are exploring the **${party.biomeName}** together.`;
+    }
+    
     const embed = new EmbedBuilder()
       .setTitle('🛡️ Exploration Party Forming!')
-      .setDescription(
-        `**Expedition has departed!**\n\n${party.joinedUsers.map((u) => `<@${u.userId}>`).join(' ')} are exploring the **${party.biomeName}** together.`
-      )
+      .setDescription(departureDescription)
       .setColor(0x5865f2)
       .setTimestamp();
 
@@ -171,16 +180,24 @@ async function startPartyExpedition(client: any, partyId: string): Promise<void>
     });
 
     // Post departure message
+    let departureMessage: string;
+    
+    if (partySize === 1) {
+      // Solo exploration - treat as normal exploration
+      departureMessage = `✨ <@${party.joinedUsers[0].userId}> ventures into the **${party.biomeName}** alone.`;
+    } else {
+      // Party exploration
+      departureMessage = `✨ The party of **${partySize}** ventures into the **${party.biomeName}** together…`;
+    }
+    
     const departureEmbed = new EmbedBuilder()
-      .setDescription(
-        `✨ The party of **${party.joinedUsers.length}** ventures into the **${party.biomeName}** together…\n\nOdds boosted by party synergy.`
-      )
+      .setDescription(departureMessage)
       .setColor(0x5865f2);
 
     await (channel as any).send({ embeds: [departureEmbed] });
 
     // Roll for shared loot (do it once for the whole party)
-    const partySize = party.joinedUsers.length;
+    // If solo (partySize = 1), party bonuses will be 0, so it works like a normal exploration
     const lootResult = rollPartyLoot(party.biome, party.durationHours, partySize);
 
     // Calculate end time
@@ -263,14 +280,34 @@ async function completePartyExpedition(client: any, partyId: string): Promise<vo
     console.log(`✅ Completed party expedition ${partyId}. Item: ${itemFound ? itemFound.name : 'None'}`);
 
     // Post final result
-    const userMentions = party.joinedUsers.map((u) => `<@${u.userId}>`).join(' ');
-
+    const partySize = party.joinedUsers.length;
+    
     if (itemFound) {
       const emoji = getRarityEmoji(itemFound.rarity);
-      const message = `${emoji} ${userMentions} return from the **${party.biomeName}** and discovered the **${itemFound.name}** (${itemFound.rarity})!`;
+      let message: string;
+      
+      if (partySize === 1) {
+        // Solo exploration
+        message = `${emoji} <@${party.joinedUsers[0].userId}> returns from the **${party.biomeName}** and discovered the **${itemFound.name}** (${itemFound.rarity})!`;
+      } else {
+        // Party exploration
+        const userMentions = party.joinedUsers.map((u) => `<@${u.userId}>`).join(' ');
+        message = `${emoji} ${userMentions} return from the **${party.biomeName}** and discovered the **${itemFound.name}** (${itemFound.rarity})!`;
+      }
+      
       await (channel as any).send(message);
     } else {
-      const message = `❌ ${userMentions} return from the **${party.biomeName}** empty-handed.`;
+      let message: string;
+      
+      if (partySize === 1) {
+        // Solo exploration
+        message = `🟤 <@${party.joinedUsers[0].userId}> returns from the **${party.biomeName}** empty-handed.`;
+      } else {
+        // Party exploration
+        const userMentions = party.joinedUsers.map((u) => `<@${u.userId}>`).join(' ');
+        message = `🟤 ${userMentions} return from the **${party.biomeName}** empty-handed.`;
+      }
+      
       await (channel as any).send(message);
     }
 
