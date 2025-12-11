@@ -52,7 +52,6 @@ function getAllEmbeds(): EmbedBuilder[] {
     .setTitle('💎 Item Rarities')
     .setDescription(
       'Items in the Underlog are classified by their rarity—a measure of how deep and far your Rover ventured:\n\n' +
-      '**⚪ Common** – Simple curios and flavor items from the surface layers.\n\n' +
       '**🍃 Uncommon** – Useful artifacts found slightly deeper in the Underlog.\n\n' +
       '**✨ Rare** – Meaningful treasures from the deeper layers where few Rovers tread.\n\n' +
       '**💎 Legendary** – Extremely rare finds with powerful signals from the deepest reaches.\n\n' +
