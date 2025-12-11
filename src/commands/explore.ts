@@ -123,9 +123,10 @@ export async function handleExploreCommand(interaction: ChatInputCommandInteract
     const multiplier = getDurationMultiplier(durationHours);
     const multiplierText = multiplier > 1 ? ` (${multiplier}x item odds)` : '';
     
-    // Send private confirmation to user
+    // Send public confirmation message
+    const userMention = `<@${userId}>`;
     await safeEditReply(interaction, {
-      content: `🔎 You set off into the **${biome.name}** for **${durationText}**${multiplierText}.\n\nI'll notify you when you return!`,
+      content: `${userMention} enters the **${biome.name}** for **${durationText}**${multiplierText}. Tracks vanish behind them.`,
     });
   } catch (error: any) {
     console.error(`🌍 [EXPLORE] ❌ Error:`, error);
