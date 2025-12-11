@@ -2,7 +2,7 @@ import { ButtonInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, Butto
 
 const ACCENT_COLOR = 0x6366f1; // Indigo color for mystical feel
 const FOOTER_TEXT = 'The Underlog · Field Guide';
-const TOTAL_PAGES = 9;
+const TOTAL_PAGES = 8;
 
 /**
  * Get all embeds for the field guide
@@ -93,19 +93,6 @@ function getAllEmbeds(): EmbedBuilder[] {
     .setColor(ACCENT_COLOR)
     .setFooter({ text: `${FOOTER_TEXT} · Page 6 of ${TOTAL_PAGES}` });
 
-  const cooldownEmbed = new EmbedBuilder()
-    .setTitle('🕒 Cooldowns')
-    .setDescription(
-      'After your Rover returns from an expedition, there\'s a cooldown before they can venture forth again.\n\n' +
-      'Cooldowns serve an important purpose:\n' +
-      '• They keep items scarce and meaningful\n' +
-      '• They make each decision—biome and duration—feel weighty\n' +
-      '• They prevent exhaustion in the Underlog\n\n' +
-      'Party expeditions share cooldown logic across everyone who participated. ' +
-      'The Underlog respects rest and reflection between journeys.'
-    )
-    .setColor(ACCENT_COLOR)
-    .setFooter({ text: `${FOOTER_TEXT} · Page 7 of ${TOTAL_PAGES}` });
 
   const inventoryEmbed = new EmbedBuilder()
     .setTitle('🎒 Inventory & Prizes')
@@ -122,7 +109,7 @@ function getAllEmbeds(): EmbedBuilder[] {
       'Every artifact tells a story of your journeys into the Underlog.'
     )
     .setColor(ACCENT_COLOR)
-    .setFooter({ text: `${FOOTER_TEXT} · Page 8 of ${TOTAL_PAGES}` });
+    .setFooter({ text: `${FOOTER_TEXT} · Page 7 of ${TOTAL_PAGES}` });
 
   const airdropsEmbed = new EmbedBuilder()
     .setTitle('🔗 Airdrops & Wallets')
@@ -136,7 +123,7 @@ function getAllEmbeds(): EmbedBuilder[] {
       'The Underlog remembers those who explore deeply.'
     )
     .setColor(ACCENT_COLOR)
-    .setFooter({ text: `${FOOTER_TEXT} · Page 9 of ${TOTAL_PAGES}` });
+    .setFooter({ text: `${FOOTER_TEXT} · Page 8 of ${TOTAL_PAGES}` });
 
   return [
     introEmbed,
@@ -145,7 +132,6 @@ function getAllEmbeds(): EmbedBuilder[] {
     raritiesEmbed,
     durationEmbed,
     partyEmbed,
-    cooldownEmbed,
     inventoryEmbed,
     airdropsEmbed,
   ];
