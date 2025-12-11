@@ -125,7 +125,7 @@ export async function handleExploreCommand(interaction: ChatInputCommandInteract
     
     // Send private confirmation to user
     await safeEditReply(interaction, {
-      content: `🚀 You set off into the **${biome.name}** for **${durationText}**${multiplierText}.\n\nI'll notify you when you return!`,
+      content: `🔎 You set off into the **${biome.name}** for **${durationText}**${multiplierText}.\n\nI'll notify you when you return!`,
     });
   } catch (error: any) {
     console.error(`🌍 [EXPLORE] ❌ Error:`, error);
