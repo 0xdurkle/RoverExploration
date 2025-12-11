@@ -4,12 +4,19 @@ import { ItemFound } from '../db/models';
 
 /**
  * Start a new exploration for a user
+ * Checks for active exploration and throws error if one exists
  */
 export async function startExploration(
   userId: string,
   biome: string,
   durationHours: number
 ): Promise<void> {
+  // Check if user already has an active exploration
+  const active = await getActiveExploration(userId);
+  if (active) {
+    throw new Error(`User ${userId} already has an active exploration`);
+  }
+  
   await createExploration(userId, biome, durationHours);
 }
 

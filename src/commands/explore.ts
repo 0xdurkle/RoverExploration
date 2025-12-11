@@ -110,6 +110,9 @@ export async function handleExploreCommand(interaction: ChatInputCommandInteract
     });
   } catch (error: any) {
     console.error(`🌍 [EXPLORE] ❌ Error:`, error);
+    console.error(`🌍 [EXPLORE] ❌ Error stack:`, error?.stack);
+    console.error(`🌍 [EXPLORE] ❌ Error message:`, error?.message);
+    console.error(`🌍 [EXPLORE] ❌ Error code:`, error?.code);
     
     if (error.message && error.message.includes('already has an active exploration')) {
       await safeEditReply(interaction, {
