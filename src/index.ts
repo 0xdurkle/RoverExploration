@@ -141,8 +141,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await handleWalletSet(interaction, address);
       } else if (subcommand === 'view') {
         await handleWalletView(interaction);
-      } else if (subcommand === 'reset') {
-        await handleWalletReset(interaction);
+      } else {
+        // Unknown subcommand - shouldn't happen but handle gracefully
+        await interaction.reply({
+          content: '❌ Unknown wallet subcommand. Use `/wallet set` or `/wallet view`.',
+          ephemeral: true,
+        });
       }
     } else if (interaction.commandName === 'party') {
       const subcommand = interaction.options.getSubcommand();
