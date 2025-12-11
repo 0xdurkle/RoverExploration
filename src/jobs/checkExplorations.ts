@@ -8,6 +8,7 @@ import { getReturnWithItemMessage, getReturnEmptyMessage } from '../utils/messag
 /**
  * Check for completed explorations and post results
  * This runs as a cron job every 10 seconds
+ * NOTE: Party explorations are handled by checkPartyExplorations.ts and should be excluded here
  */
 export async function checkAndProcessExplorations(client: Client): Promise<void> {
   try {
@@ -15,6 +16,25 @@ export async function checkAndProcessExplorations(client: Client): Promise<void>
 
     if (completed.length === 0) {
       return; // No completed explorations
+    }
+
+    // Get all active party exploration IDs to exclude them from solo processing
+    // This prevents party explorations from being processed twice (once by party handler, once by solo handler)
+    const { getAllParties } = await import('../services/partyService');
+    const allParties = getAllParties();
+    const partyExplorationIds = new Set<number>();
+    
+    for (const party of allParties) {
+      if (party.explorationIds && party.explorationIds.length > 0) {
+        party.explorationIds.forEach(id => partyExplorationIds.add(id));
+      }
+    }
+
+    // Filter out party explorations - they're handled by checkPartyExplorations.ts
+    const soloExplorations = completed.filter(exp => !partyExplorationIds.has(exp.id));
+
+    if (soloExplorations.length === 0) {
+      return; // No solo explorations to process
     }
 
     const channelId = process.env.DISCORD_CHANNEL_ID;
@@ -29,10 +49,10 @@ export async function checkAndProcessExplorations(client: Client): Promise<void>
       return;
     }
 
-    // Finish all explorations first and collect results
+    // Finish all solo explorations first and collect results
     const explorationResults = new Map<number, { exploration: Exploration; itemFound: Awaited<ReturnType<typeof finishExploration>> }>();
     
-    for (const exploration of completed) {
+    for (const exploration of soloExplorations) {
       const itemFound = await finishExploration(
         exploration.id,
         exploration.user_id,
@@ -72,7 +92,7 @@ export async function checkAndProcessExplorations(client: Client): Promise<void>
       await processGroupedExplorations(group, channel);
     }
 
-    console.log(`✅ Processed ${completed.length} completed exploration(s)`);
+    console.log(`✅ Processed ${soloExplorations.length} completed solo exploration(s)`);
   } catch (error) {
     console.error('❌ Error checking explorations:', error);
   }

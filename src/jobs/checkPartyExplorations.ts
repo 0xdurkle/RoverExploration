@@ -50,6 +50,10 @@ async function completePartyExpedition(client: Client, partyId: string): Promise
     return;
   }
 
+  // Mark party as completed IMMEDIATELY to prevent race conditions
+  // This ensures checkExplorations.ts won't process these explorations
+  party.completed = true;
+
   try {
     const channelId = party.channelId;
     if (!channelId) {
@@ -77,7 +81,8 @@ async function completePartyExpedition(client: Client, partyId: string): Promise
         }
       : null;
 
-    // Mark all party explorations as completed with the same item
+    // CRITICAL: Mark all party explorations as completed with the same item FIRST
+    // This must happen before posting messages to prevent checkExplorations.ts from processing them
     for (const explorationId of explorationIds) {
       try {
         await completeExploration(explorationId, itemFound);
@@ -88,39 +93,18 @@ async function completePartyExpedition(client: Client, partyId: string): Promise
 
     console.log(`✅ Completed party expedition ${partyId}. Item: ${itemFound ? itemFound.name : 'None'}`);
 
-    // Post final result using message variations
+    // Post ONE final result message for the entire party
     const partySize = party.joinedUsers.length;
+    const userMentions = party.joinedUsers.map((u) => `<@${u.userId}>`).join(' ');
     
     if (itemFound) {
       const emoji = getRarityEmoji(itemFound.rarity);
-      
-      if (partySize === 1) {
-        // Solo exploration
-        const userMention = `<@${party.joinedUsers[0].userId}>`;
-        const message = getReturnWithItemMessage(emoji, userMention, party.biomeName, itemFound.name, itemFound.rarity);
-        await (channel as TextChannel).send(message);
-      } else {
-        // Party exploration - combine all user mentions
-        const userMentions = party.joinedUsers.map((u) => `<@${u.userId}>`).join(' ');
-        const message = getReturnWithItemMessage(emoji, userMentions, party.biomeName, itemFound.name, itemFound.rarity);
-        await (channel as TextChannel).send(message);
-      }
+      const message = getReturnWithItemMessage(emoji, userMentions, party.biomeName, itemFound.name, itemFound.rarity);
+      await (channel as TextChannel).send(message);
     } else {
-      if (partySize === 1) {
-        // Solo exploration
-        const userMention = `<@${party.joinedUsers[0].userId}>`;
-        const message = getReturnEmptyMessage(userMention, party.biomeName);
-        await (channel as TextChannel).send(message);
-      } else {
-        // Party exploration
-        const userMentions = party.joinedUsers.map((u) => `<@${u.userId}>`).join(' ');
-        const message = getReturnEmptyMessage(userMentions, party.biomeName);
-        await (channel as TextChannel).send(message);
-      }
+      const message = getReturnEmptyMessage(userMentions, party.biomeName);
+      await (channel as TextChannel).send(message);
     }
-
-    // Mark party as completed
-    party.completed = true;
     
     // Cleanup after a delay
     setTimeout(() => {
