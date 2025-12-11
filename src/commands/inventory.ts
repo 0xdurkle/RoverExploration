@@ -66,11 +66,11 @@ export async function handleInventoryCommand(interaction: ChatInputCommandIntera
     stats.push(`**Current Streak:** ${currentStreak} day${currentStreak !== 1 ? 's' : ''}`);
     stats.push(`**Longest Streak:** ${longestStreak} day${longestStreak !== 1 ? 's' : ''}`);
 
-    embed.addFields({
-      name: 'Stats',
-      value: stats.join('\n'),
-      inline: false,
-    });
+        embed.addFields({
+          name: '\u200b', // Zero-width space (invisible field name)
+          value: stats.join('\n'),
+          inline: false,
+        });
 
     // Add biome collections
     const biomeProgress = buildBiomeProgress(itemsFound);
