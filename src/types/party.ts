@@ -7,6 +7,11 @@ export interface PartyMember {
   joinedAt: Date;
 }
 
+export interface PartyLootResult {
+  name: string;
+  rarity: 'uncommon' | 'rare' | 'legendary' | 'epic';
+}
+
 export interface Party {
   id: string;
   creatorId: string;
@@ -21,5 +26,9 @@ export interface Party {
   channelId?: string;
   started: boolean;
   completed?: boolean;
+  // Extended properties for party expedition lifecycle
+  lootResult?: PartyLootResult | null;
+  endsAt?: Date;
+  explorationIds?: number[];
 }
 

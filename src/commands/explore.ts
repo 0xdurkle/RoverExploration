@@ -137,9 +137,17 @@ export async function handleExploreCommand(interaction: ChatInputCommandInteract
     });
     
     // Then send public message to channel (not as a reply, standalone comment)
-    const channel = interaction.channel;
-    if (channel && channel.isTextBased() && !channel.isDMBased()) {
-      await (channel as TextChannel).send(message);
+    try {
+      const channel = interaction.channel;
+      if (channel && channel.isTextBased() && !channel.isDMBased()) {
+        await (channel as TextChannel).send(message);
+      } else {
+        console.warn(`🌍 [EXPLORE] Could not send public message: channel is not available or is a DM`);
+      }
+    } catch (sendError) {
+      // Log error but don't fail the exploration - it's already created
+      console.error(`🌍 [EXPLORE] Failed to send public exploration message:`, sendError);
+      // Exploration is still created successfully, user got ephemeral confirmation
     }
   } catch (error: any) {
     console.error(`🌍 [EXPLORE] ❌ Error:`, error);

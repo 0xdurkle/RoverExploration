@@ -94,6 +94,7 @@ export async function getCompletedExplorations(): Promise<Exploration[]> {
 
 /**
  * Mark exploration as completed and store item found
+ * Uses transaction to ensure atomicity
  */
 export async function completeExploration(
   explorationId: number,
@@ -101,22 +102,43 @@ export async function completeExploration(
 ): Promise<void> {
   const db = getDb();
 
-  await db.query(
-    `UPDATE explorations
-     SET completed = TRUE, item_found = $1
-     WHERE id = $2`,
-    [itemFound ? JSON.stringify(itemFound) : null, explorationId]
-  );
+  try {
+    // Begin transaction
+    await db.query('BEGIN');
 
-  // Update user profile
-  const exploration = await db.query(
-    `SELECT user_id, ends_at FROM explorations WHERE id = $1`,
-    [explorationId]
-  );
+    // Get exploration data first (needed for profile update)
+    const exploration = await db.query(
+      `SELECT user_id, ends_at FROM explorations WHERE id = $1 AND completed = FALSE FOR UPDATE`,
+      [explorationId]
+    );
 
-  if (exploration.rows[0]) {
+    if (!exploration.rows[0]) {
+      // Already completed or doesn't exist
+      await db.query('ROLLBACK');
+      return;
+    }
+
     const { user_id, ends_at } = exploration.rows[0];
+
+    // Mark exploration as completed
+    await db.query(
+      `UPDATE explorations
+       SET completed = TRUE, item_found = $1
+       WHERE id = $2`,
+      [itemFound ? JSON.stringify(itemFound) : null, explorationId]
+    );
+
+    // Update user profile (in same transaction)
     await updateUserProfile(user_id, ends_at, itemFound);
+
+    // Commit transaction
+    await db.query('COMMIT');
+  } catch (error) {
+    // Rollback on any error
+    await db.query('ROLLBACK').catch(() => {
+      // Ignore rollback errors
+    });
+    throw error;
   }
 }
 

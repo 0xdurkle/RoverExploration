@@ -65,7 +65,7 @@ async function createTables(): Promise<void> {
         id SERIAL PRIMARY KEY,
         user_id VARCHAR(20) NOT NULL,
         biome VARCHAR(50) NOT NULL,
-        duration_hours INTEGER NOT NULL,
+        duration_hours DECIMAL(10, 6) NOT NULL,
         started_at TIMESTAMP NOT NULL,
         ends_at TIMESTAMP NOT NULL,
         completed BOOLEAN DEFAULT FALSE,
@@ -73,6 +73,19 @@ async function createTables(): Promise<void> {
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
+    
+    // Add unique constraint to prevent multiple active explorations per user
+    // Only applies to incomplete explorations (PostgreSQL partial index)
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_user_active_exploration 
+      ON explorations(user_id) 
+      WHERE completed = FALSE AND ends_at > NOW()
+    `).catch((err) => {
+      // Index might already exist, ignore error
+      if (!err.message.includes('already exists')) {
+        console.warn('Warning creating unique index:', err.message);
+      }
+    });
 
     // User profiles table
     await pool.query(`

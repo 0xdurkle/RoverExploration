@@ -18,6 +18,11 @@ interface Item {
   baseProbability: number;
 }
 
+interface Duration {
+  hours: number;
+  multiplier: number;
+}
+
 /**
  * Roll for item discovery with party bonuses
  * All party members get the same result
@@ -46,7 +51,7 @@ export function rollPartyLoot(biomeId: string, durationHours: number, partySize:
   // Get duration multiplier
   let durationMultiplier = 1.0;
   if (!is30Second) {
-    const duration = (biomesData.durations as any[]).find((d) => Math.abs(d.hours - durationHours) < 0.0001);
+    const duration = (biomesData.durations as Duration[]).find((d) => Math.abs(d.hours - durationHours) < 0.0001);
     durationMultiplier = duration?.multiplier || 1.0;
   }
 

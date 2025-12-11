@@ -1,7 +1,8 @@
-import { ChatInputCommandInteraction, EmbedBuilder, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { ChatInputCommandInteraction, EmbedBuilder, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, TextChannel } from 'discord.js';
 import { createParty } from '../services/partyService';
 import { getAllBiomes } from '../services/rng';
 import { getCooldownRemaining } from '../services/cooldownService';
+import { getReturnWithItemMessage, getReturnEmptyMessage } from '../utils/messageVariations';
 
 /**
  * Handle /party create command
@@ -92,7 +93,7 @@ export async function handlePartyCreate(interaction: ChatInputCommandInteraction
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(joinButton);
 
     // Send public message first
-    const message = await (publicChannel as any).send({
+    const message = await (publicChannel as TextChannel).send({
       embeds: [embed],
       components: [row],
     });
@@ -174,7 +175,7 @@ async function startPartyExpedition(client: any, partyId: string): Promise<void>
       .setColor(0x5865f2)
       .setTimestamp();
 
-    await (channel as any).messages.edit(party.messageId!, {
+    await (channel as TextChannel).messages.edit(party.messageId!, {
       embeds: [embed],
       components: [],
     });
@@ -194,7 +195,7 @@ async function startPartyExpedition(client: any, partyId: string): Promise<void>
       .setDescription(departureMessage)
       .setColor(0x5865f2);
 
-    await (channel as any).send({ embeds: [departureEmbed] });
+    await (channel as TextChannel).send({ embeds: [departureEmbed] });
 
     // Roll for shared loot (do it once for the whole party)
     // If solo (partySize = 1), party bonuses will be 0, so it works like a normal exploration
@@ -205,16 +206,48 @@ async function startPartyExpedition(client: any, partyId: string): Promise<void>
     const endsAt = new Date(startedAt.getTime() + party.durationHours * 60 * 60 * 1000);
 
     // Store the loot result in the party for later
-    (party as any).lootResult = lootResult;
-    (party as any).endsAt = endsAt;
+    party.lootResult = lootResult;
+    party.endsAt = endsAt;
 
     // Create exploration for each party member
+    // Check for active explorations first to prevent duplicates
     const explorationIds: number[] = [];
+    const failedMembers: string[] = [];
+    
     for (const member of party.joinedUsers) {
-      const exploration = await createExploration(member.userId, party.biome, party.durationHours);
-      explorationIds.push(exploration.id);
+      try {
+        // Check if member already has an active exploration
+        const { getActiveExploration } = await import('../db/models');
+        const active = await getActiveExploration(member.userId);
+        
+        if (active) {
+          console.log(`⚠️ Party member ${member.userId} already has an active exploration, skipping party exploration creation`);
+          failedMembers.push(member.userId);
+          continue;
+        }
+        
+        const { createExploration } = await import('../db/models');
+        const exploration = await createExploration(member.userId, party.biome, party.durationHours);
+        explorationIds.push(exploration.id);
+      } catch (error: any) {
+        // Handle unique constraint violation (race condition)
+        if (error.code === '23505' || (error.message && error.message.includes('already has an active exploration'))) {
+          console.log(`⚠️ Party member ${member.userId} has active exploration, skipping party exploration creation`);
+          failedMembers.push(member.userId);
+        } else {
+          console.error(`❌ Error creating exploration for party member ${member.userId}:`, error);
+          // Continue with other members even if one fails
+        }
+      }
     }
-    (party as any).explorationIds = explorationIds;
+    
+    // Store exploration IDs
+    party.explorationIds = explorationIds;
+    
+    // Log if any members were skipped
+    if (failedMembers.length > 0) {
+      console.log(`⚠️ Skipped ${failedMembers.length} party member(s) due to existing active explorations: ${failedMembers.join(', ')}`);
+    }
 
     // Store party completion data
     party.completed = false;
@@ -255,8 +288,8 @@ async function completePartyExpedition(client: any, partyId: string): Promise<vo
     }
 
     // Get the loot result that was stored when party started
-    const lootResult = (party as any).lootResult;
-    const explorationIds = (party as any).explorationIds || [];
+    const lootResult = party.lootResult;
+    const explorationIds = party.explorationIds || [];
 
     // Create item found object if loot was discovered
     const itemFound = lootResult
@@ -279,36 +312,35 @@ async function completePartyExpedition(client: any, partyId: string): Promise<vo
 
     console.log(`✅ Completed party expedition ${partyId}. Item: ${itemFound ? itemFound.name : 'None'}`);
 
-    // Post final result
+    // Post final result using message variations
     const partySize = party.joinedUsers.length;
     
     if (itemFound) {
       const emoji = getRarityEmoji(itemFound.rarity);
-      let message: string;
       
       if (partySize === 1) {
         // Solo exploration
-        message = `${emoji} <@${party.joinedUsers[0].userId}> returns from the **${party.biomeName}** and discovered the **${itemFound.name}** (${itemFound.rarity})!`;
+        const userMention = `<@${party.joinedUsers[0].userId}>`;
+        const message = getReturnWithItemMessage(emoji, userMention, party.biomeName, itemFound.name, itemFound.rarity);
+        await (channel as TextChannel).send(message);
       } else {
-        // Party exploration
+        // Party exploration - combine all user mentions
         const userMentions = party.joinedUsers.map((u) => `<@${u.userId}>`).join(' ');
-        message = `${emoji} ${userMentions} return from the **${party.biomeName}** and discovered the **${itemFound.name}** (${itemFound.rarity})!`;
+        const message = getReturnWithItemMessage(emoji, userMentions, party.biomeName, itemFound.name, itemFound.rarity);
+        await (channel as TextChannel).send(message);
       }
-      
-      await (channel as any).send(message);
     } else {
-      let message: string;
-      
       if (partySize === 1) {
         // Solo exploration
-        message = `❌ <@${party.joinedUsers[0].userId}> returns from the **${party.biomeName}** empty-handed.`;
+        const userMention = `<@${party.joinedUsers[0].userId}>`;
+        const message = getReturnEmptyMessage(userMention, party.biomeName);
+        await (channel as TextChannel).send(message);
       } else {
         // Party exploration
         const userMentions = party.joinedUsers.map((u) => `<@${u.userId}>`).join(' ');
-        message = `❌ ${userMentions} return from the **${party.biomeName}** empty-handed.`;
+        const message = getReturnEmptyMessage(userMentions, party.biomeName);
+        await (channel as TextChannel).send(message);
       }
-      
-      await (channel as any).send(message);
     }
 
     party.completed = true;

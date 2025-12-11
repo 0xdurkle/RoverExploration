@@ -4,36 +4,39 @@ import { ItemFound } from '../db/models';
 
 /**
  * Start a new exploration for a user
- * Checks for active exploration and throws error if one exists
+ * Uses database unique constraint to prevent race conditions
+ * Throws error if user already has an active exploration
  */
 export async function startExploration(
   userId: string,
   biome: string,
   durationHours: number
 ): Promise<void> {
-  // Check if user already has an active exploration
-  const active = await getActiveExploration(userId);
-  if (active) {
-    throw new Error(`User ${userId} already has an active exploration`);
+  try {
+    await createExploration(userId, biome, durationHours);
+  } catch (error: any) {
+    // Check if error is due to unique constraint violation (race condition)
+    if (error.code === '23505' && error.constraint === 'idx_user_active_exploration') {
+      throw new Error(`User ${userId} already has an active exploration`);
+    }
+    // Re-throw other errors
+    throw error;
   }
-  
-  await createExploration(userId, biome, durationHours);
 }
 
 /**
  * Process a completed exploration and determine rewards
+ * NOTE: This function is currently unused - exploration completion is handled
+ * directly in checkExplorations.ts. Keeping for potential future use.
  */
 export async function processCompletedExploration(explorationId: number): Promise<{
   userId: string;
   biome: string;
   itemFound: ItemFound | null;
 }> {
-  // Get exploration details (we'll fetch this in the job)
-  // For now, we'll handle this in the job file
-
-  // This function will be called from the cron job
-  // The actual exploration data will be passed from there
-  throw new Error('This function should be called with exploration data');
+  // This function is not currently used
+  // Exploration completion is handled in checkExplorations.ts
+  throw new Error('This function is not currently implemented. Use finishExploration() instead.');
 }
 
 /**
