@@ -7,7 +7,7 @@ import { handleHowCommand } from './commands/how';
 import { handlePartyCreate, getPartyCommandBuilder } from './commands/party';
 import { handleEndAllCommand, getEndAllCommandBuilder } from './commands/endAll';
 import { handleInventoryCommand, getInventoryCommandBuilder } from './commands/inventory';
-import { handleWalletSet, handleWalletView, handleWalletReset, getWalletCommandBuilder } from './commands/wallet';
+import { handleWalletSet, handleWalletView, getWalletCommandBuilder } from './commands/wallet';
 import { handleHowNavigation } from './handlers/howNavigation';
 import { handlePartyJoin } from './handlers/partyJoin';
 import { checkAndProcessExplorations } from './jobs/checkExplorations';

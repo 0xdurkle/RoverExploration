@@ -1,7 +1,6 @@
 import { ChatInputCommandInteraction, SlashCommandBuilder, SlashCommandSubcommandsOnlyBuilder } from 'discord.js';
 import { ethers } from 'ethers';
-import { saveUserWallet, getUserWallet, getUserWalletByAddress, deleteUserWallet } from '../db/models';
-import { isAdmin } from '../utils/adminHelpers';
+import { saveUserWallet, getUserWallet, getUserWalletByAddress } from '../db/models';
 
 /**
  * Handle /wallet set command
@@ -119,61 +118,6 @@ export async function handleWalletView(interaction: ChatInputCommandInteraction)
 }
 
 /**
- * Handle /wallet reset command
- */
-export async function handleWalletReset(interaction: ChatInputCommandInteraction): Promise<void> {
-  await interaction.deferReply({ ephemeral: true });
-
-  try {
-    const targetUser = interaction.options.getUser('user', true);
-    const targetUserId = targetUser.id;
-    const requesterId = interaction.user.id;
-
-    // Users can only reset their own wallet (unless they're an admin)
-    const admin = await isAdmin(interaction);
-    if (!admin && targetUserId !== requesterId) {
-      await interaction.editReply({
-        content: '❌ You can only reset your own wallet. Use `/wallet reset` and select yourself.',
-      });
-      return;
-    }
-
-    // Get target user's wallet
-    const wallet = await getUserWallet(targetUserId);
-    if (!wallet) {
-      await interaction.editReply({
-        content: `❌ ${targetUserId === requesterId ? 'You do not' : `User <@${targetUserId}> does not`} have a wallet linked.`,
-      });
-      return;
-    }
-
-    // Delete the wallet
-    const deleted = await deleteUserWallet(targetUserId);
-    if (!deleted) {
-      await interaction.editReply({
-        content: '❌ Failed to reset wallet. Please try again.',
-      });
-      return;
-    }
-
-    if (targetUserId === requesterId) {
-      await interaction.editReply({
-        content: `✅ Successfully reset your wallet.\n\nPrevious wallet: \`${wallet.wallet_address}\`\n\nYou can now set a new wallet using \`/wallet set\`.`,
-      });
-    } else {
-      await interaction.editReply({
-        content: `✅ Successfully reset wallet for <@${targetUserId}>.\n\nPrevious wallet: \`${wallet.wallet_address}\`\n\nThey can now set a new wallet using \`/wallet set\`.`,
-      });
-    }
-  } catch (error) {
-    console.error('Error resetting wallet:', error);
-    await interaction.editReply({
-      content: '❌ An error occurred while resetting the wallet. Please try again.',
-    });
-  }
-}
-
-/**
  * Get wallet command builder for registration
  */
 export function getWalletCommandBuilder(): SlashCommandSubcommandsOnlyBuilder {
@@ -193,17 +137,6 @@ export function getWalletCommandBuilder(): SlashCommandSubcommandsOnlyBuilder {
     )
     .addSubcommand((subcommand) =>
       subcommand.setName('view').setDescription('View your linked Ethereum wallet address')
-    )
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName('reset')
-        .setDescription('Reset your wallet address (or another user\'s if you\'re an admin)')
-        .addUserOption((option) =>
-          option
-            .setName('user')
-            .setDescription('The user whose wallet should be reset (defaults to you)')
-            .setRequired(true)
-        )
     );
 }
 
