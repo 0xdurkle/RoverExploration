@@ -50,8 +50,8 @@ export async function handleExploreCommand(interaction: ChatInputCommandInteract
     const userId = interaction.user.id;
     console.log(`🌍 [EXPLORE] User ${userId} starting exploration`);
     
-    // Defer reply immediately
-    await safeDeferReply(interaction, { ephemeral: true });
+    // Defer reply immediately (public message)
+    await safeDeferReply(interaction, { ephemeral: false });
     
     // Get options (with defensive checks)
     const biomeOption = interaction.options.get('biome');

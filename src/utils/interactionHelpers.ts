@@ -54,11 +54,15 @@ export async function safeDeferReply(
     const deferOptions: { flags?: number } = {};
     if (options?.flags !== undefined) {
       deferOptions.flags = options.flags;
-    } else if (options?.ephemeral) {
+    } else if (options?.ephemeral === true) {
       deferOptions.flags = 64; // Ephemeral flag
+    } else if (options?.ephemeral === false) {
+      // Explicitly public (no flags needed, but we'll omit the flags property)
+      // No flags means public
     }
     
     // Try to defer - this must happen within 3 seconds of interaction creation
+    // If no flags specified and ephemeral is false, send empty object (public)
     await interaction.deferReply(Object.keys(deferOptions).length > 0 ? deferOptions : {});
     console.log(`✅ [INTERACTION] Successfully deferred reply for interaction ${interaction.id}`);
     return true;
