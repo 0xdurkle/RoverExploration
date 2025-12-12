@@ -13,9 +13,18 @@ console.log('Current working directory:', currentDir);
 
 // List files in current directory for debugging
 try {
-  console.log('Files in current directory:', fs.readdirSync(currentDir).join(', '));
-  if (fs.existsSync(path.join(currentDir, 'dashboard-api'))) {
-    console.log('Files in dashboard-api:', fs.readdirSync(path.join(currentDir, 'dashboard-api')).join(', '));
+  const files = fs.readdirSync(currentDir);
+  console.log('Files in current directory:', files.join(', '));
+  
+  // Check if dashboard-api folder exists
+  if (files.includes('dashboard-api')) {
+    const dashboardFiles = fs.readdirSync(path.join(currentDir, 'dashboard-api'));
+    console.log('Files in dashboard-api folder:', dashboardFiles.join(', '));
+  }
+  
+  // Check if we're already in dashboard-api (Root Directory working)
+  if (files.includes('tsconfig.json') && files.includes('src')) {
+    console.log('✅ Looks like we ARE in dashboard-api directory (Root Directory is working!)');
   }
 } catch (e) {
   console.log('Could not list files:', e.message);
