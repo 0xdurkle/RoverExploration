@@ -16,7 +16,9 @@ const possiblePaths = [
   path.join(scriptDir, 'tsconfig.json'),                    // Same dir as build.js
   path.join(currentDir, 'tsconfig.json'),                   // Current working dir
   path.join(currentDir, 'dashboard-api', 'tsconfig.json'),  // dashboard-api subdir from root
-  path.join(scriptDir, '..', 'dashboard-api', 'tsconfig.json'), // Relative to script
+  path.join('/app', 'dashboard-api', 'tsconfig.json'),      // Absolute path from Railway /app
+  path.join(process.cwd(), 'dashboard-api', 'tsconfig.json'), // dashboard-api from cwd
+  path.join(__dirname, 'tsconfig.json'),                     // Same as scriptDir but explicit
 ];
 
 let foundPath = null;
