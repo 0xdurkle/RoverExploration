@@ -11,6 +11,16 @@ const currentDir = process.cwd();
 console.log('Build script location:', scriptDir);
 console.log('Current working directory:', currentDir);
 
+// List files in current directory for debugging
+try {
+  console.log('Files in current directory:', fs.readdirSync(currentDir).join(', '));
+  if (fs.existsSync(path.join(currentDir, 'dashboard-api'))) {
+    console.log('Files in dashboard-api:', fs.readdirSync(path.join(currentDir, 'dashboard-api')).join(', '));
+  }
+} catch (e) {
+  console.log('Could not list files:', e.message);
+}
+
 // Try multiple possible locations for tsconfig.json
 const possiblePaths = [
   path.join(scriptDir, 'tsconfig.json'),                    // Same dir as build.js
