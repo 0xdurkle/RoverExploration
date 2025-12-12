@@ -6,23 +6,40 @@ const fs = require('fs');
 
 // Get the directory where this script is located
 const scriptDir = __dirname;
-const tsconfigPath = path.join(scriptDir, 'tsconfig.json');
+const currentDir = process.cwd();
 
-// Check if tsconfig.json exists in script directory
-if (fs.existsSync(tsconfigPath)) {
-  // We're in the right directory, just run tsc
-  console.log('Running tsc from:', scriptDir);
-  process.chdir(scriptDir);
-  execSync('npx tsc', { stdio: 'inherit' });
-} else {
-  // Try dashboard-api subdirectory
-  const dashboardApiPath = path.join(process.cwd(), 'dashboard-api', 'tsconfig.json');
-  if (fs.existsSync(dashboardApiPath)) {
-    console.log('Running tsc from:', path.join(process.cwd(), 'dashboard-api'));
-    process.chdir(path.join(process.cwd(), 'dashboard-api'));
-    execSync('npx tsc', { stdio: 'inherit' });
-  } else {
-    console.error('Could not find tsconfig.json');
-    process.exit(1);
+console.log('Build script location:', scriptDir);
+console.log('Current working directory:', currentDir);
+
+// Try multiple possible locations for tsconfig.json
+const possiblePaths = [
+  path.join(scriptDir, 'tsconfig.json'),                    // Same dir as build.js
+  path.join(currentDir, 'tsconfig.json'),                   // Current working dir
+  path.join(currentDir, 'dashboard-api', 'tsconfig.json'),  // dashboard-api subdir from root
+  path.join(scriptDir, '..', 'dashboard-api', 'tsconfig.json'), // Relative to script
+];
+
+let foundPath = null;
+let workDir = null;
+
+for (const tsconfigPath of possiblePaths) {
+  console.log('Checking:', tsconfigPath);
+  if (fs.existsSync(tsconfigPath)) {
+    foundPath = tsconfigPath;
+    workDir = path.dirname(tsconfigPath);
+    console.log('✅ Found tsconfig.json at:', foundPath);
+    console.log('✅ Working directory:', workDir);
+    break;
   }
 }
+
+if (!foundPath) {
+  console.error('❌ Could not find tsconfig.json in any of these locations:');
+  possiblePaths.forEach(p => console.error('  -', p));
+  process.exit(1);
+}
+
+// Change to the directory with tsconfig.json and run tsc
+process.chdir(workDir);
+console.log('Running tsc in:', process.cwd());
+execSync('npx tsc', { stdio: 'inherit' });
