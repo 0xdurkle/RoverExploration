@@ -22,14 +22,23 @@ try {
 }
 
 // Try multiple possible locations for tsconfig.json
+// Railway seems to run from /app even with Root Directory set
 const possiblePaths = [
   path.join(scriptDir, 'tsconfig.json'),                    // Same dir as build.js
   path.join(currentDir, 'tsconfig.json'),                   // Current working dir
-  path.join(currentDir, 'dashboard-api', 'tsconfig.json'),  // dashboard-api subdir from root
   path.join('/app', 'dashboard-api', 'tsconfig.json'),      // Absolute path from Railway /app
+  path.join(currentDir, 'dashboard-api', 'tsconfig.json'),  // dashboard-api subdir from root
   path.join(process.cwd(), 'dashboard-api', 'tsconfig.json'), // dashboard-api from cwd
-  path.join(__dirname, 'tsconfig.json'),                     // Same as scriptDir but explicit
 ];
+
+// Also check if we need to look for dashboard-api folder
+if (currentDir === '/app' || currentDir.endsWith('/app')) {
+  // We're in Railway's /app, look for dashboard-api subfolder
+  const dashboardApiPath = '/app/dashboard-api/tsconfig.json';
+  if (!possiblePaths.includes(dashboardApiPath)) {
+    possiblePaths.unshift(dashboardApiPath); // Check this first
+  }
+}
 
 let foundPath = null;
 let workDir = null;
