@@ -321,7 +321,10 @@ async function saveBiomesData(biomesData: any): Promise<void> {
   
   if (botSyncUrl && syncApiKey) {
     try {
-      const response = await fetch(`${botSyncUrl}/api/sync/biomes`, {
+      const syncUrl = `${botSyncUrl}/api/sync/biomes`;
+      console.log(`🔄 Attempting to sync biomes.json to bot service at: ${syncUrl}`);
+      
+      const response = await fetch(syncUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -331,17 +334,24 @@ async function saveBiomesData(biomesData: any): Promise<void> {
       });
 
       if (response.ok) {
-        console.log('✅ Synced biomes.json to bot service');
+        const result = await response.json();
+        console.log('✅ Synced biomes.json to bot service:', result.message || 'Success');
       } else {
         const errorText = await response.text();
-        console.warn(`⚠️ Failed to sync with bot service: ${response.status} - ${errorText}`);
+        console.error(`❌ Failed to sync with bot service: ${response.status} - ${errorText}`);
+        console.error(`   Sync URL: ${syncUrl}`);
+        console.error(`   API Key present: ${!!syncApiKey}`);
       }
     } catch (error: any) {
-      console.warn(`⚠️ Error syncing with bot service: ${error.message}`);
+      console.error(`❌ Error syncing with bot service:`, error);
+      console.error(`   Error message: ${error.message}`);
+      console.error(`   Error stack: ${error.stack}`);
       // Don't throw - local save succeeded, sync is optional
     }
   } else {
     console.warn('⚠️ BOT_SYNC_URL or SYNC_API_KEY not set, skipping bot sync');
+    console.warn(`   BOT_SYNC_URL: ${botSyncUrl || 'NOT SET'}`);
+    console.warn(`   SYNC_API_KEY: ${syncApiKey ? 'SET' : 'NOT SET'}`);
   }
 }
 
@@ -494,30 +504,50 @@ app.put('/api/items/:itemName', async (req, res) => {
         const db = getDb();
         
         // Update user_profiles.items_found (JSONB array)
-        await db.query(`
-          UPDATE user_profiles
-          SET items_found = (
-            SELECT jsonb_agg(
-              CASE 
-                WHEN item->>'name' = $1 THEN jsonb_set(item, '{name}', to_jsonb($2::text))
-                ELSE item
-              END
-            )
-            FROM jsonb_array_elements(items_found) AS item
-          )
-          WHERE items_found @> jsonb_build_array(jsonb_build_object('name', $1))
-        `, [oldName, targetItem.name]);
+        // Use a simpler approach: fetch, update in JS, save back
+        const profilesResult = await db.query(
+          `SELECT user_id, items_found FROM user_profiles WHERE items_found @> $1::jsonb`,
+          [JSON.stringify([{ name: oldName }])]
+        );
+
+        for (const row of profilesResult.rows) {
+          const itemsFound = row.items_found || [];
+          let updated = false;
+          
+          const updatedItems = itemsFound.map((item: any) => {
+            if (item && item.name === oldName) {
+              updated = true;
+              return { ...item, name: targetItem.name };
+            }
+            return item;
+          });
+
+          if (updated) {
+            await db.query(
+              `UPDATE user_profiles SET items_found = $1 WHERE user_id = $2`,
+              [JSON.stringify(updatedItems), row.user_id]
+            );
+            console.log(`✅ Updated inventory for user ${row.user_id}: "${oldName}" → "${targetItem.name}"`);
+          }
+        }
 
         // Update explorations.item_found (single JSONB object)
-        await db.query(`
-          UPDATE explorations
-          SET item_found = jsonb_set(item_found, '{name}', to_jsonb($2::text))
-          WHERE item_found->>'name' = $1
-        `, [oldName, targetItem.name]);
+        const explorationsResult = await db.query(
+          `UPDATE explorations
+           SET item_found = jsonb_set(item_found, '{name}', to_jsonb($2::text))
+           WHERE item_found->>'name' = $1
+           RETURNING id`,
+          [oldName, targetItem.name]
+        );
 
-        console.log(`✅ Updated database: renamed "${oldName}" to "${targetItem.name}"`);
+        if (explorationsResult.rowCount && explorationsResult.rowCount > 0) {
+          console.log(`✅ Updated ${explorationsResult.rowCount} exploration(s): "${oldName}" → "${targetItem.name}"`);
+        }
+
+        console.log(`✅ Database update complete: renamed "${oldName}" to "${targetItem.name}"`);
       } catch (dbError: any) {
-        console.error('⚠️ Warning: Could not update database entries:', dbError.message);
+        console.error('❌ Error updating database entries:', dbError);
+        console.error('Stack:', dbError.stack);
         // Don't fail the request if DB update fails - biomes.json was already updated
       }
     }
