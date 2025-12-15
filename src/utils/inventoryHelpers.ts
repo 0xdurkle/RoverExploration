@@ -186,10 +186,11 @@ export function buildBiomeProgress(itemsFound: ItemFound[]): BiomeProgress[] {
   const biomes = getAllBiomes();
   const userCounts = countUserItems(itemsFound);
   
-  // Create a map of item name -> stored rarity from user's found items
+  // Create a map of item name -> stored rarity and biome from user's found items
   const storedRarities = new Map<string, string>();
+  const storedBiomes = new Map<string, string>(); // Store biome ID or name for each item
   // Also create a normalized map (lowercase, trimmed) for fuzzy matching
-  const normalizedUserItems = new Map<string, { originalName: string; count: number; rarity: string }>();
+  const normalizedUserItems = new Map<string, { originalName: string; count: number; rarity: string; biome: string }>();
   
   // Debug: log all user items
   const uniqueUserItems = new Set<string>();
@@ -202,6 +203,20 @@ export function buildBiomeProgress(itemsFound: ItemFound[]): BiomeProgress[] {
       storedRarities.set(item.name, item.rarity);
     }
     
+    // Store biome - normalize biome ID to match biome.id format
+    if (!storedBiomes.has(item.name)) {
+      // Convert biome name to ID if needed (e.g., "Crystal Caverns" -> "crystal_caverns")
+      let biomeId = item.biome;
+      if (!biomeId.includes('_')) {
+        // It's a name, try to find the ID
+        const matchingBiome = biomes.find(b => b.name.toLowerCase() === biomeId.toLowerCase());
+        if (matchingBiome) {
+          biomeId = matchingBiome.id;
+        }
+      }
+      storedBiomes.set(item.name, biomeId);
+    }
+    
     // Create normalized version for fuzzy matching
     const normalized = item.name.toLowerCase().trim();
     const count = userCounts.get(item.name) || 0;
@@ -210,6 +225,7 @@ export function buildBiomeProgress(itemsFound: ItemFound[]): BiomeProgress[] {
         originalName: item.name,
         count,
         rarity: item.rarity,
+        biome: storedBiomes.get(item.name) || item.biome,
       });
     }
   });
@@ -237,19 +253,32 @@ export function buildBiomeProgress(itemsFound: ItemFound[]): BiomeProgress[] {
         const normalized = item.name.toLowerCase().trim();
         const matched = normalizedUserItems.get(normalized);
         if (matched) {
-          count = matched.count;
-          rarity = matched.rarity;
-          console.log(`✅ Matched item by normalized name: "${matched.originalName}" -> "${item.name}" (count: ${count})`);
+          // Verify biome matches before using this match
+          const matchedBiomeId = matched.biome.includes('_') ? matched.biome : 
+            biomes.find(b => b.name.toLowerCase() === matched.biome.toLowerCase())?.id || matched.biome;
+          if (matchedBiomeId === biome.id || matched.biome.toLowerCase() === biome.name.toLowerCase()) {
+            count = matched.count;
+            rarity = matched.rarity;
+            console.log(`✅ Matched item by normalized name: "${matched.originalName}" -> "${item.name}" (count: ${count}, biome: ${matched.biome})`);
+          }
         } else {
-          // Try partial/fuzzy matching - check if any user item contains the biome item name or vice versa
-          const itemWords = normalized.split(/\s+/).filter(w => w.length > 2); // Split into words, ignore short words
+          // Try partial/fuzzy matching - but ONLY if biome matches
+          const itemWords = normalized.split(/\s+/).filter(w => w.length > 2);
           
           for (const [userNormalized, userData] of normalizedUserItems.entries()) {
+            // First verify biome matches
+            const userBiomeId = userData.biome.includes('_') ? userData.biome : 
+              biomes.find(b => b.name.toLowerCase() === userData.biome.toLowerCase())?.id || userData.biome;
+            
+            if (userBiomeId !== biome.id && userData.biome.toLowerCase() !== biome.name.toLowerCase()) {
+              continue; // Skip if biome doesn't match
+            }
+            
             // Check if biome item name is contained in user item name (e.g., "Resonant Geode Core" contains "Resonant Geode")
             if (userNormalized.includes(normalized) || normalized.includes(userNormalized)) {
               count = userData.count;
               rarity = userData.rarity;
-              console.log(`✅ Matched item by substring: "${userData.originalName}" -> "${item.name}" (count: ${count})`);
+              console.log(`✅ Matched item by substring (biome verified): "${userData.originalName}" -> "${item.name}" (count: ${count})`);
               break;
             }
             
@@ -261,14 +290,21 @@ export function buildBiomeProgress(itemsFound: ItemFound[]): BiomeProgress[] {
             if (allWordsMatch || coreMatch) {
               count = userData.count;
               rarity = userData.rarity;
-              console.log(`✅ Matched item by fuzzy matching: "${userData.originalName}" -> "${item.name}" (count: ${count})`);
+              console.log(`✅ Matched item by fuzzy matching (biome verified): "${userData.originalName}" -> "${item.name}" (count: ${count})`);
               break;
             }
           }
           
           if (count === 0 && isCrystalCaverns) {
             console.log(`❌ No match for "${item.name}" (normalized: "${normalized}")`);
-            console.log(`   Available normalized items: ${Array.from(normalizedUserItems.keys()).join(', ')}`);
+            console.log(`   Available normalized items in ${biome.name}: ${Array.from(normalizedUserItems.entries())
+              .filter(([_, data]) => {
+                const dataBiomeId = data.biome.includes('_') ? data.biome : 
+                  biomes.find(b => b.name.toLowerCase() === data.biome.toLowerCase())?.id || data.biome;
+                return dataBiomeId === biome.id;
+              })
+              .map(([norm, _]) => norm)
+              .join(', ')}`);
           }
         }
       }
