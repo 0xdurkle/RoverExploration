@@ -19,33 +19,40 @@ app.use(express.json());
 initDb();
 
 // Initialize Discord client for fetching usernames
+// NOTE: This is disabled for now in the API responses because it is causing
+// an internal error in the production (Railway) environment:
+// "Cannot read properties of undefined (reading 'searchParams')".
+// The dashboard does not *need* live Discord usernames, only a label, so
+// we fall back to a simple "User <id>" string instead of calling Discord.
+//
+// Keeping the client wiring here for potential future re‑enablement, but
+// getDiscordUsername below no longer performs any Discord API calls.
 let discordClient: Client | null = null;
 if (process.env.DISCORD_BOT_TOKEN) {
-  discordClient = new Client({
-    intents: [
-      GatewayIntentBits.Guilds,
-      GatewayIntentBits.GuildMembers,
-    ],
-  });
-  
-  discordClient.login(process.env.DISCORD_BOT_TOKEN).catch((error) => {
-    console.error('⚠️ Failed to login Discord client for username fetching:', error.message);
+  try {
+    discordClient = new Client({
+      intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMembers,
+      ],
+    });
+
+    // Best‑effort login; failures are logged but do not break the API.
+    discordClient.login(process.env.DISCORD_BOT_TOKEN).catch((error) => {
+      console.error('⚠️ Failed to login Discord client for username fetching:', error?.message || error);
+      discordClient = null;
+    });
+  } catch (error) {
+    console.error('⚠️ Error initialising Discord client:', error);
     discordClient = null;
-  });
+  }
 }
 
 // Helper function to fetch Discord username
+// For stability in hosted environments, this currently *only* returns a
+// fallback string and does not call Discord at all.
 async function getDiscordUsername(userId: string): Promise<string> {
-  if (!discordClient || !discordClient.isReady()) {
-    return `User ${userId}`;
-  }
-  
-  try {
-    const user = await discordClient.users.fetch(userId);
-    return user.username;
-  } catch (error) {
-    return `User ${userId}`;
-  }
+  return `User ${userId}`;
 }
 
 // Get all users with their data
