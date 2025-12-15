@@ -4,6 +4,7 @@ import { config } from 'dotenv';
 import { initDb, getDb } from './db';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import { Client, GatewayIntentBits } from 'discord.js';
 
 config();
 
@@ -17,11 +18,44 @@ app.use(express.json());
 // Initialize database
 initDb();
 
-// Helper function to generate a display name for a Discord user.
-// We deliberately avoid calling the Discord API from this service to
-// keep the dashboard API simple and robust in hosted environments.
+// --- Discord username lookup -------------------------------------------------
+
+let discordClient: Client | null = null;
+
+if (process.env.DISCORD_BOT_TOKEN) {
+  try {
+    discordClient = new Client({
+      intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMembers,
+      ],
+    });
+
+    discordClient.login(process.env.DISCORD_BOT_TOKEN).catch((error) => {
+      console.error('⚠️ Failed to login Discord client for dashboard usernames:', error?.message || error);
+      discordClient = null;
+    });
+  } catch (error) {
+    console.error('⚠️ Error initialising Discord client for dashboard usernames:', error);
+    discordClient = null;
+  }
+} else {
+  console.warn('⚠️ DISCORD_BOT_TOKEN is not set for dashboard-api; falling back to raw IDs for usernames.');
+}
+
 async function getDiscordUsername(userId: string): Promise<string> {
-  return `User ${userId}`;
+  // If we don't have a working Discord client, just show the raw ID.
+  if (!discordClient || !discordClient.isReady()) {
+    return userId;
+  }
+
+  try {
+    const user = await discordClient.users.fetch(userId);
+    return user.username || userId;
+  } catch (error) {
+    console.error(`⚠️ Failed to fetch Discord username for ${userId}:`, (error as any)?.message || error);
+    return userId;
+  }
 }
 
 // Get all users with their data
