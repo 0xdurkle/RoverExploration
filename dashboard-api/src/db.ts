@@ -10,9 +10,12 @@ export function initDb(): void {
   }
 
   // Manually parse the DATABASE_URL instead of letting pg parse it.
-  // This avoids the "Cannot read properties of undefined (reading 'searchParams')"
-  // error coming from pg-connection-string in some hosted environments.
-  const url = new URL(databaseUrl);
+  // Normalise the scheme to "http" so Node's URL parser is always happy,
+  // then extract the connection pieces. This avoids the earlier
+  // "Cannot read properties of undefined (reading 'searchParams')" error
+  // coming from pg-connection-string.
+  const normalised = databaseUrl.replace(/^postgres(ql)?:\/\//, 'http://');
+  const url = new URL(normalised);
 
   const ssl =
     process.env.NODE_ENV === 'production'
