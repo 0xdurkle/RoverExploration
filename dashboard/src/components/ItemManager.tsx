@@ -37,6 +37,11 @@ const ItemManager = () => {
   const [newBaseProbability, setNewBaseProbability] = useState(0.01)
   const [creating, setCreating] = useState(false)
   const [createStatus, setCreateStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  
+  // Delete confirmation
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteStatus, setDeleteStatus] = useState<'idle' | 'success' | 'error'>('idle')
 
   useEffect(() => {
     fetchItems()
@@ -163,6 +168,43 @@ const ItemManager = () => {
 
   const formatProbability = (value: number) => {
     return `${(value * 100).toFixed(4)}%`
+  }
+
+  const handleDeleteItem = async () => {
+    if (!selectedItem) return
+
+    setDeleting(true)
+    setDeleteStatus('idle')
+
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/api/items/${encodeURIComponent(selectedItem.name)}`,
+        {
+          method: 'DELETE',
+        }
+      )
+
+      if (res.ok) {
+        setDeleteStatus('success')
+        // Remove from local state
+        setItems(items.filter((item) => item.name !== selectedItem.name))
+        setSelectedItem(null)
+        setEditName('')
+        setEditRarity('uncommon')
+        setEditBiomeId('')
+        setShowDeleteConfirm(false)
+        setTimeout(() => setDeleteStatus('idle'), 2000)
+      } else {
+        setDeleteStatus('error')
+        setTimeout(() => setDeleteStatus('idle'), 3000)
+      }
+    } catch (error) {
+      console.error('Error deleting item:', error)
+      setDeleteStatus('error')
+      setTimeout(() => setDeleteStatus('idle'), 3000)
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const handleCreateItem = async () => {
@@ -505,6 +547,56 @@ const ItemManager = () => {
                 )}
                 {createStatus === 'error' && (
                   <span className="save-status error">✗ Error creating item.</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteConfirm && selectedItem && (
+        <div className="modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="modal-content delete-confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>⚠️ Delete Item</h3>
+              <button
+                className="modal-close"
+                onClick={() => setShowDeleteConfirm(false)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="delete-warning">
+                <p className="warning-text">
+                  <strong>Are you sure you want to delete "{selectedItem.name}"?</strong>
+                </p>
+                <p className="warning-details">
+                  This action cannot be undone. The item will be permanently removed from{' '}
+                  <strong>{selectedItem.biome}</strong> and will no longer appear in the Discord bot.
+                </p>
+                <p className="warning-details">
+                  This will affect item discovery rates and user inventories.
+                </p>
+              </div>
+              <div className="rarity-actions">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={deleting}
+                  className="cancel-button"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteItem}
+                  disabled={deleting}
+                  className="delete-button confirm-delete"
+                >
+                  {deleting ? 'Deleting...' : 'Yes, Delete Item'}
+                </button>
+                {deleteStatus === 'success' && (
+                  <span className="save-status success">✓ Item deleted successfully!</span>
                 )}
               </div>
             </div>

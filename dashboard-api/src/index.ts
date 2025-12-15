@@ -262,19 +262,64 @@ app.get('/api/actions', async (req, res) => {
   }
 });
 
+// Helper function to get biomes.json paths (tries both dashboard-api and bot locations)
+function getBiomesPaths(): string[] {
+  return [
+    // Dashboard-api location
+    join(process.cwd(), 'data/biomes.json'),
+    join(__dirname, '../data/biomes.json'),
+    // Bot location (if accessible from dashboard-api service)
+    join(process.cwd(), '../../src/data/biomes.json'),
+    join(__dirname, '../../../src/data/biomes.json'),
+    join(process.cwd(), '../src/data/biomes.json'),
+  ];
+}
+
+// Helper function to find and load biomes.json
+function loadBiomesData(): { data: any; path: string } {
+  const possiblePaths = getBiomesPaths();
+  const biomesPath = possiblePaths.find(p => existsSync(p));
+  if (!biomesPath) {
+    throw new Error(`biomes.json not found. Tried: ${possiblePaths.join(', ')}`);
+  }
+  const data = JSON.parse(readFileSync(biomesPath, 'utf-8'));
+  return { data, path: biomesPath };
+}
+
+// Helper function to save biomes.json to all accessible locations
+function saveBiomesData(biomesData: any): void {
+  const possiblePaths = getBiomesPaths();
+  const jsonString = JSON.stringify(biomesData, null, 2);
+  
+  let savedCount = 0;
+  for (const path of possiblePaths) {
+    if (existsSync(path) || path.includes('data/biomes.json')) {
+      try {
+        // Ensure directory exists
+        const dir = require('path').dirname(path);
+        if (!existsSync(dir)) {
+          require('fs').mkdirSync(dir, { recursive: true });
+        }
+        writeFileSync(path, jsonString, 'utf-8');
+        savedCount++;
+        console.log(`✅ Saved biomes.json to: ${path}`);
+      } catch (error: any) {
+        console.warn(`⚠️ Could not save to ${path}: ${error.message}`);
+      }
+    }
+  }
+  
+  if (savedCount === 0) {
+    throw new Error('Failed to save biomes.json to any location');
+  }
+  
+  console.log(`✅ Synced biomes.json to ${savedCount} location(s)`);
+}
+
 // Get all items from biomes.json
 app.get('/api/items', (req, res) => {
   try {
-    // Use local biomes data bundled with the dashboard-api service
-    const possiblePaths = [
-      join(process.cwd(), 'data/biomes.json'),
-      join(__dirname, '../data/biomes.json'),
-    ];
-    let biomesPath = possiblePaths.find(p => existsSync(p));
-    if (!biomesPath) {
-      throw new Error(`biomes.json not found. Tried: ${possiblePaths.join(', ')}`);
-    }
-    const biomesData = JSON.parse(readFileSync(biomesPath, 'utf-8'));
+    const { data: biomesData } = loadBiomesData();
     
     const allItems: Array<{
       name: string;
@@ -316,15 +361,7 @@ app.put('/api/items/:itemName/rarity', (req, res) => {
       return res.status(400).json({ error: 'baseProbability must be a number between 0 and 1' });
     }
 
-    const possiblePaths = [
-      join(process.cwd(), 'data/biomes.json'),
-      join(__dirname, '../data/biomes.json'),
-    ];
-    let biomesPath = possiblePaths.find(p => existsSync(p));
-    if (!biomesPath) {
-      throw new Error(`biomes.json not found. Tried: ${possiblePaths.join(', ')}`);
-    }
-    const biomesData = JSON.parse(readFileSync(biomesPath, 'utf-8'));
+    const { data: biomesData } = loadBiomesData();
 
     let found = false;
     biomesData.biomes.forEach((biome: any) => {
@@ -340,7 +377,7 @@ app.put('/api/items/:itemName/rarity', (req, res) => {
       return res.status(404).json({ error: 'Item not found' });
     }
 
-    writeFileSync(biomesPath, JSON.stringify(biomesData, null, 2), 'utf-8');
+    saveBiomesData(biomesData);
 
     res.json({ success: true, itemName, baseProbability });
   } catch (error) {
@@ -370,15 +407,7 @@ app.put('/api/items/:itemName', (req, res) => {
     }
 
     // Load biomes data
-    const possiblePaths = [
-      join(process.cwd(), 'data/biomes.json'),
-      join(__dirname, '../data/biomes.json'),
-    ];
-    let biomesPath = possiblePaths.find(p => existsSync(p));
-    if (!biomesPath) {
-      throw new Error(`biomes.json not found. Tried: ${possiblePaths.join(', ')}`);
-    }
-    const biomesData = JSON.parse(readFileSync(biomesPath, 'utf-8'));
+    const { data: biomesData } = loadBiomesData();
 
     let found = false;
     let targetBiome: any = null;
@@ -425,7 +454,7 @@ app.put('/api/items/:itemName', (req, res) => {
       targetBiome = newBiome;
     }
 
-    writeFileSync(biomesPath, JSON.stringify(biomesData, null, 2), 'utf-8');
+    saveBiomesData(biomesData);
 
     res.json({
       success: true,
@@ -461,15 +490,7 @@ app.post('/api/biomes/:biomeId/items', (req, res) => {
       return res.status(400).json({ error: 'baseProbability must be a number between 0 and 1' });
     }
 
-    const possiblePaths = [
-      join(process.cwd(), 'data/biomes.json'),
-      join(__dirname, '../data/biomes.json'),
-    ];
-    let biomesPath = possiblePaths.find(p => existsSync(p));
-    if (!biomesPath) {
-      throw new Error(`biomes.json not found. Tried: ${possiblePaths.join(', ')}`);
-    }
-    const biomesData = JSON.parse(readFileSync(biomesPath, 'utf-8'));
+    const { data: biomesData } = loadBiomesData();
 
     const biome = biomesData.biomes.find((b: any) => b.id === biomeId);
     if (!biome) {
@@ -488,7 +509,7 @@ app.post('/api/biomes/:biomeId/items', (req, res) => {
 
     biome.items.push(newItem);
 
-    writeFileSync(biomesPath, JSON.stringify(biomesData, null, 2), 'utf-8');
+    saveBiomesData(biomesData);
 
     res.status(201).json({
       success: true,
@@ -506,18 +527,46 @@ app.post('/api/biomes/:biomeId/items', (req, res) => {
   }
 });
 
+// Delete an item
+app.delete('/api/items/:itemName', (req, res) => {
+  try {
+    const { itemName } = req.params;
+    const { data: biomesData } = loadBiomesData();
+
+    let found = false;
+    let targetBiome: any = null;
+
+    // Find and remove the item
+    for (const biome of biomesData.biomes) {
+      const itemIndex = biome.items.findIndex((i: any) => i.name === itemName);
+      if (itemIndex !== -1) {
+        found = true;
+        targetBiome = biome;
+        biome.items.splice(itemIndex, 1);
+        break;
+      }
+    }
+
+    if (!found) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+
+    saveBiomesData(biomesData);
+
+    res.json({
+      success: true,
+      message: `Item "${itemName}" deleted from ${targetBiome.name}`,
+    });
+  } catch (error) {
+    console.error('Error deleting item:', error);
+    res.status(500).json({ error: 'Failed to delete item' });
+  }
+});
+
 // Get biomes data
 app.get('/api/biomes', (req, res) => {
   try {
-    const possiblePaths = [
-      join(process.cwd(), 'data/biomes.json'),
-      join(__dirname, '../data/biomes.json'),
-    ];
-    let biomesPath = possiblePaths.find(p => existsSync(p));
-    if (!biomesPath) {
-      throw new Error(`biomes.json not found. Tried: ${possiblePaths.join(', ')}`);
-    }
-    const biomesData = JSON.parse(readFileSync(biomesPath, 'utf-8'));
+    const { data: biomesData } = loadBiomesData();
     res.json(biomesData);
   } catch (error) {
     console.error('Error fetching biomes:', error);
