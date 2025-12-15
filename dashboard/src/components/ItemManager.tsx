@@ -30,6 +30,7 @@ const ItemManager = () => {
   const [editBiomeId, setEditBiomeId] = useState('')
 
   // New item form
+  const [showCreateModal, setShowCreateModal] = useState(false)
   const [newName, setNewName] = useState('')
   const [newRarity, setNewRarity] = useState('uncommon')
   const [newBiomeId, setNewBiomeId] = useState('')
@@ -197,13 +198,17 @@ const ItemManager = () => {
             }
           : null
 
-        if (created) {
-          setItems([...items, created])
-        }
-        setNewName('')
-        setNewBaseProbability(0.01)
-        setCreateStatus('success')
-        setTimeout(() => setCreateStatus('idle'), 2000)
+      if (created) {
+        setItems([...items, created])
+      }
+      setNewName('')
+      setNewBaseProbability(0.01)
+      setNewBiomeId('')
+      setCreateStatus('success')
+      setTimeout(() => {
+        setCreateStatus('idle')
+        setShowCreateModal(false)
+      }, 2000)
       } else {
         setCreateStatus('error')
         setTimeout(() => setCreateStatus('idle'), 3000)
@@ -229,10 +234,19 @@ const ItemManager = () => {
   return (
     <div className="rarity-editor">
       <div className="rarity-editor-header">
-        <h2>Item Manager</h2>
-        <p className="rarity-editor-subtitle">
-          Edit item details, move items between biomes, and create new items.
-        </p>
+        <div>
+          <h2>Item Manager</h2>
+          <p className="rarity-editor-subtitle">
+            Edit item details, move items between biomes, and create new items.
+          </p>
+        </div>
+        <button
+          className="create-item-button"
+          onClick={() => setShowCreateModal(true)}
+          title="Create New Item"
+        >
+          <span className="create-item-icon">+</span>
+        </button>
       </div>
 
       <div className="rarity-editor-content">
@@ -397,90 +411,106 @@ const ItemManager = () => {
         </div>
       </div>
 
-      <div className="rarity-editor-create">
-        <h3>Create New Item</h3>
-        <div className="create-grid">
-          <div className="create-field">
-            <label className="rarity-label">Name</label>
-            <input
-              type="text"
-              className="rarity-input"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-            />
-          </div>
-          <div className="create-field">
-            <label className="rarity-label">Rarity</label>
-            <select
-              className="item-select"
-              value={newRarity}
-              onChange={(e) => setNewRarity(e.target.value)}
-            >
-              <option value="uncommon">Uncommon</option>
-              <option value="rare">Rare</option>
-              <option value="epic">Epic</option>
-              <option value="legendary">Legendary</option>
-            </select>
-          </div>
-          <div className="create-field">
-            <label className="rarity-label">Biome</label>
-            <select
-              className="item-select"
-              value={newBiomeId}
-              onChange={(e) => setNewBiomeId(e.target.value)}
-            >
-              <option value="">-- Select biome --</option>
-              {biomes.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="create-field">
-            <label className="rarity-label">
-              Base Probability: {formatProbability(newBaseProbability)}
-            </label>
-            <div className="rarity-input-group">
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.0001"
-                value={newBaseProbability}
-                onChange={(e) => setNewBaseProbability(parseFloat(e.target.value))}
-                className="rarity-slider"
-              />
-              <input
-                type="number"
-                min="0"
-                max="1"
-                step="0.0001"
-                value={newBaseProbability}
-                onChange={(e) => setNewBaseProbability(parseFloat(e.target.value))}
-                className="rarity-input"
-              />
+      {showCreateModal && (
+        <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Create New Item</h3>
+              <button
+                className="modal-close"
+                onClick={() => setShowCreateModal(false)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="create-grid">
+                <div className="create-field">
+                  <label className="rarity-label">Name</label>
+                  <input
+                    type="text"
+                    className="rarity-input"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="Enter item name"
+                  />
+                </div>
+                <div className="create-field">
+                  <label className="rarity-label">Rarity</label>
+                  <select
+                    className="item-select"
+                    value={newRarity}
+                    onChange={(e) => setNewRarity(e.target.value)}
+                  >
+                    <option value="uncommon">Uncommon</option>
+                    <option value="rare">Rare</option>
+                    <option value="epic">Epic</option>
+                    <option value="legendary">Legendary</option>
+                  </select>
+                </div>
+                <div className="create-field">
+                  <label className="rarity-label">Biome</label>
+                  <select
+                    className="item-select"
+                    value={newBiomeId}
+                    onChange={(e) => setNewBiomeId(e.target.value)}
+                  >
+                    <option value="">-- Select biome --</option>
+                    {biomes.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="create-field">
+                  <label className="rarity-label">
+                    Base Probability: {formatProbability(newBaseProbability)}
+                  </label>
+                  <div className="rarity-input-group">
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.0001"
+                      value={newBaseProbability}
+                      onChange={(e) => setNewBaseProbability(parseFloat(e.target.value))}
+                      className="rarity-slider"
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      max="1"
+                      step="0.0001"
+                      value={newBaseProbability}
+                      onChange={(e) => setNewBaseProbability(parseFloat(e.target.value))}
+                      className="rarity-input"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="rarity-actions">
+                <button
+                  onClick={handleCreateItem}
+                  disabled={
+                    creating || !newName || !newBiomeId || Number.isNaN(newBaseProbability)
+                  }
+                  className="save-button"
+                >
+                  {creating ? 'Creating...' : 'Create Item'}
+                </button>
+                {createStatus === 'success' && (
+                  <span className="save-status success">✓ Item created!</span>
+                )}
+                {createStatus === 'error' && (
+                  <span className="save-status error">✗ Error creating item.</span>
+                )}
+              </div>
             </div>
           </div>
         </div>
-        <div className="rarity-actions">
-          <button
-            onClick={handleCreateItem}
-            disabled={
-              creating || !newName || !newBiomeId || Number.isNaN(newBaseProbability)
-            }
-            className="save-button"
-          >
-            {creating ? 'Creating...' : 'Create Item'}
-          </button>
-          {createStatus === 'success' && (
-            <span className="save-status success">✓ Item created!</span>
-          )}
-          {createStatus === 'error' && (
-            <span className="save-status error">✗ Error creating item.</span>
-          )}
-        </div>
-      </div>
+      )}
     </div>
   )
 }
