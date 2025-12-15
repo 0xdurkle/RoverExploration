@@ -12,4 +12,10 @@ export default defineConfig({
       },
     },
   },
+  preview: {
+    // Allow Railway (and any other) hosts to access the preview server
+    // so we don't get "host is not allowed" errors in production.
+    allowedHosts: true,
+  },
 })
+
