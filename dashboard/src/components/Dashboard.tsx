@@ -272,6 +272,7 @@ const Dashboard = () => {
   ])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null) // Format: "userId-type" e.g., "123-inventory" or "123-actions"
 
   useEffect(() => {
     fetchData()
