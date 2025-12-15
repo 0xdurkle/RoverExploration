@@ -322,8 +322,6 @@ async function saveBiomesData(biomesData: any): Promise<void> {
   if (botSyncUrl && syncApiKey) {
     try {
       const syncUrl = `${botSyncUrl}/api/sync/biomes`;
-      console.log(`🔄 Attempting to sync biomes.json to bot service at: ${syncUrl}`);
-      
       const response = await fetch(syncUrl, {
         method: 'POST',
         headers: {
@@ -334,24 +332,17 @@ async function saveBiomesData(biomesData: any): Promise<void> {
       });
 
       if (response.ok) {
-        const result = await response.json() as { message?: string };
-        console.log('✅ Synced biomes.json to bot service:', result.message || 'Success');
+        console.log('✅ Synced biomes.json to bot service');
       } else {
         const errorText = await response.text();
         console.error(`❌ Failed to sync with bot service: ${response.status} - ${errorText}`);
-        console.error(`   Sync URL: ${syncUrl}`);
-        console.error(`   API Key present: ${!!syncApiKey}`);
       }
     } catch (error: any) {
-      console.error(`❌ Error syncing with bot service:`, error);
-      console.error(`   Error message: ${error.message}`);
-      console.error(`   Error stack: ${error.stack}`);
+      console.error(`❌ Error syncing with bot service: ${error.message}`);
       // Don't throw - local save succeeded, sync is optional
     }
   } else {
     console.warn('⚠️ BOT_SYNC_URL or SYNC_API_KEY not set, skipping bot sync');
-    console.warn(`   BOT_SYNC_URL: ${botSyncUrl || 'NOT SET'}`);
-    console.warn(`   SYNC_API_KEY: ${syncApiKey ? 'SET' : 'NOT SET'}`);
   }
 }
 

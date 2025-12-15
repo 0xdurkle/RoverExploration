@@ -242,7 +242,7 @@ syncApp.post('/api/sync/biomes', (req: Request, res: Response) => {
     // Reload the biomes data in memory
     reloadBiomesData();
     
-    console.log(`✅ Biomes.json synced from dashboard-api and reloaded`);
+    console.log('✅ Biomes.json synced from dashboard-api and reloaded');
     res.json({ success: true, message: 'Biomes.json updated and reloaded successfully' });
   } catch (error: any) {
     console.error('❌ Error syncing biomes:', error);
