@@ -170,6 +170,14 @@ const ItemManager = () => {
     return `${(value * 100).toFixed(4)}%`
   }
 
+  // Check if any fields have been modified
+  const hasChanges = selectedItem
+    ? editName !== selectedItem.name ||
+      editRarity !== selectedItem.rarity ||
+      editBiomeId !== selectedItem.biomeId ||
+      Math.abs(rarityValue - selectedItem.baseProbability) > 0.0001
+    : false
+
   const handleDeleteItem = async () => {
     if (!selectedItem) return
 
@@ -433,7 +441,7 @@ const ItemManager = () => {
                 <div className="action-buttons-group">
                   <button
                     onClick={handleSave}
-                    disabled={saving || rarityValue === selectedItem.baseProbability}
+                    disabled={saving || !hasChanges}
                     className="save-button"
                   >
                     {saving ? 'Saving...' : 'Save Changes'}
