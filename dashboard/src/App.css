@@ -1,0 +1,105 @@
+.app {
+  min-height: 100vh;
+  background-color: #23272a;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  background-color: #2f3136;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  height: 60px;
+  flex-shrink: 0;
+  box-shadow: 0 1px 0 rgba(4, 4, 5, 0.2), 0 1.5px 0 rgba(6, 6, 7, 0.05), 0 2px 0 rgba(4, 4, 5, 0.05);
+}
+
+.header-title {
+  display: flex;
+  align-items: center;
+}
+
+.header-title h1 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.header-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background-color: transparent;
+  border: none;
+  border-radius: 4px;
+  color: #b9bbbe;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+  height: 36px;
+}
+
+.nav-item:hover {
+  background-color: rgba(79, 84, 92, 0.16);
+  color: #dcddde;
+}
+
+.nav-item.active {
+  background-color: rgba(88, 101, 242, 0.1);
+  color: #ffffff;
+}
+
+.nav-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: #5865f2;
+  border-radius: 2px 2px 0 0;
+}
+
+.nav-icon {
+  font-size: 16px;
+  width: 18px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: #36393f;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+}
+
+.app-content {
+  padding: 20px;
+  width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background-color: #36393f;
+  flex: 1;
+  min-height: 0;
+}
