@@ -430,6 +430,9 @@ app.put('/api/items/:itemName', (req, res) => {
       return res.status(404).json({ error: 'Item not found' });
     }
 
+    // Store old name if name is being changed (for database updates)
+    const oldName = name !== undefined && name !== itemName ? itemName : null;
+
     // Apply updates on the found item
     if (name !== undefined) {
       targetItem.name = name;
@@ -455,6 +458,40 @@ app.put('/api/items/:itemName', (req, res) => {
     }
 
     saveBiomesData(biomesData);
+
+    // If name changed, update all database entries with the old name
+    if (oldName) {
+      try {
+        const db = getDb();
+        
+        // Update user_profiles.items_found (JSONB array)
+        await db.query(`
+          UPDATE user_profiles
+          SET items_found = (
+            SELECT jsonb_agg(
+              CASE 
+                WHEN item->>'name' = $1 THEN jsonb_set(item, '{name}', to_jsonb($2::text))
+                ELSE item
+              END
+            )
+            FROM jsonb_array_elements(items_found) AS item
+          )
+          WHERE items_found @> jsonb_build_array(jsonb_build_object('name', $1))
+        `, [oldName, targetItem.name]);
+
+        // Update explorations.item_found (single JSONB object)
+        await db.query(`
+          UPDATE explorations
+          SET item_found = jsonb_set(item_found, '{name}', to_jsonb($2::text))
+          WHERE item_found->>'name' = $1
+        `, [oldName, targetItem.name]);
+
+        console.log(`✅ Updated database: renamed "${oldName}" to "${targetItem.name}"`);
+      } catch (dbError: any) {
+        console.error('⚠️ Warning: Could not update database entries:', dbError.message);
+        // Don't fail the request if DB update fails - biomes.json was already updated
+      }
+    }
 
     res.json({
       success: true,
