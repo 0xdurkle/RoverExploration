@@ -353,8 +353,8 @@ const ItemManager = () => {
                 >
                   <option value="uncommon">Uncommon</option>
                   <option value="rare">Rare</option>
-                  <option value="epic">Epic</option>
                   <option value="legendary">Legendary</option>
+                  <option value="epic">Epic</option>
                 </select>
               </div>
               <div className="info-row">
