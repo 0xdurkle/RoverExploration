@@ -245,11 +245,17 @@ export function buildBiomeProgress(itemsFound: ItemFound[]): BiomeProgress[] {
           const itemWords = normalized.split(/\s+/).filter(w => w.length > 2); // Split into words, ignore short words
           
           for (const [userNormalized, userData] of normalizedUserItems.entries()) {
-            const userWords = userNormalized.split(/\s+/).filter(w => w.length > 2);
+            // Check if biome item name is contained in user item name (e.g., "Resonant Geode Core" contains "Resonant Geode")
+            if (userNormalized.includes(normalized) || normalized.includes(userNormalized)) {
+              count = userData.count;
+              rarity = userData.rarity;
+              console.log(`✅ Matched item by substring: "${userData.originalName}" -> "${item.name}" (count: ${count})`);
+              break;
+            }
             
             // Check if all significant words from biome item are in user item
-            const allWordsMatch = itemWords.every(word => userNormalized.includes(word));
-            // Or check if user item contains the core part of biome item (at least 3+ character words)
+            const allWordsMatch = itemWords.length > 0 && itemWords.every(word => userNormalized.includes(word));
+            // Or check if user item contains the core part of biome item (at least 4+ character words)
             const coreMatch = itemWords.some(word => word.length >= 4 && userNormalized.includes(word));
             
             if (allWordsMatch || coreMatch) {
