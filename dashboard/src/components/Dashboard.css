@@ -240,11 +240,6 @@
   font-size: 15px;
 }
 
-.user-id {
-  color: #72767d;
-  font-size: 13px;
-  font-weight: 400;
-}
 
 .wallet-address {
   background-color: #1e2124;
@@ -538,3 +533,4 @@
 .retry-button:active {
   transform: translateY(1px);
 }
+

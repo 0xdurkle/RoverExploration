@@ -171,7 +171,6 @@ const Dashboard = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set())
   const [columns, setColumns] = useState<Column[]>([
-    { id: 'discordId', label: 'Discord ID', visible: true },
     { id: 'discordName', label: 'Discord Name', visible: true },
     { id: 'walletAddress', label: 'Wallet Address', visible: true },
     { id: 'inventory', label: 'Inventory', visible: true },
@@ -273,7 +272,6 @@ const Dashboard = () => {
     const term = searchTerm.toLowerCase()
     return users.filter(
       (user) =>
-        user.discordId.toLowerCase().includes(term) ||
         user.discordName.toLowerCase().includes(term) ||
         user.walletAddress?.toLowerCase().includes(term) ||
         user.inventory.some((item) => item.name.toLowerCase().includes(term))
@@ -310,8 +308,6 @@ const Dashboard = () => {
       const userActions = getUserActions(user.discordId)
       return visibleColumns.map((col) => {
         switch (col.id) {
-          case 'discordId':
-            return user.discordId
           case 'discordName':
             return user.discordName
           case 'walletAddress':
@@ -372,7 +368,7 @@ const Dashboard = () => {
         <div className="search-box">
           <input
             type="text"
-            placeholder="Search by Discord ID, name, wallet, or item..."
+            placeholder="Search by Discord name, wallet, or item..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="search-input"
@@ -445,7 +441,6 @@ const Dashboard = () => {
                     <td>
                       <div className="user-cell">
                         <span className="user-name">{user.discordName}</span>
-                        <span className="user-id">{user.discordId}</span>
                       </div>
                     </td>
                   )}
