@@ -342,25 +342,8 @@ const Dashboard = () => {
     URL.revokeObjectURL(url)
   }
 
-  const getStatusDot = (user: User) => {
-    if (!user.lastActivity) return 'offline'
-    const lastActivity = new Date(user.lastActivity)
-    const hoursSinceActivity = (Date.now() - lastActivity.getTime()) / (1000 * 60 * 60)
-    return hoursSinceActivity < 24 ? 'online' : hoursSinceActivity < 168 ? 'idle' : 'offline'
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'online':
-        return '#23a55a' // Discord's exact online green
-      case 'idle':
-        return '#f0b232' // Discord's exact idle yellow
-      case 'offline':
-        return '#80848e' // Discord's exact offline gray
-      default:
-        return '#80848e'
-    }
-  }
+  // Status dots were previously inferred from last activity, but this was
+  // often misleading. They've been removed from the UI to avoid confusion.
 
   if (loading) {
     return (
@@ -448,7 +431,6 @@ const Dashboard = () => {
           </thead>
           <tbody>
             {filteredUsers.map((user) => {
-              const status = getStatusDot(user)
               const userActions = getUserActions(user.discordId)
               return (
                 <tr key={user.discordId}>
@@ -462,10 +444,6 @@ const Dashboard = () => {
                   {columns.find((c) => c.id === 'discordName')?.visible && (
                     <td>
                       <div className="user-cell">
-                        <span
-                          className="status-dot"
-                          style={{ backgroundColor: getStatusColor(status) }}
-                        />
                         <span className="user-name">{user.discordName}</span>
                         <span className="user-id">{user.discordId}</span>
                       </div>
