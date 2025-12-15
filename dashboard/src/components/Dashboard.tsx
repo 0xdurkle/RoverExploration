@@ -28,22 +28,50 @@ interface Action {
 const ActionsDisplay = ({ actions, formatActionLog }: { actions: Action[]; formatActionLog: (action: Action) => string }) => {
   const [isOpen, setIsOpen] = useState(false)
   const [flipUpward, setFlipUpward] = useState(false)
+  const [maxHeight, setMaxHeight] = useState<number | undefined>(undefined)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (isOpen && dropdownRef.current && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect()
-      const dropdownHeight = dropdownRef.current.offsetHeight || 300 // fallback to max-height
-      const spaceBelow = window.innerHeight - rect.bottom
-      const spaceAbove = rect.top
+      // Use setTimeout to ensure dropdown is fully rendered and measured
+      const checkPosition = () => {
+        if (!dropdownRef.current || !containerRef.current) return
+        
+        const rect = containerRef.current.getBoundingClientRect()
+        const dropdownHeight = dropdownRef.current.scrollHeight || 300
+        const spaceBelow = window.innerHeight - rect.bottom - 4 // margin
+        const spaceAbove = rect.top - 4 // margin
 
-      // Flip upward if there's not enough space below but there is above
-      if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
-        setFlipUpward(true)
-      } else {
-        setFlipUpward(false)
+        // Flip upward if there's not enough space below but there is above
+        if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+          setFlipUpward(true)
+          // Adjust max-height to fit in available space above
+          const availableSpace = Math.max(spaceAbove - 8, 150) // minimum 150px
+          setMaxHeight(availableSpace)
+        } else {
+          setFlipUpward(false)
+          // Adjust max-height to fit in available space below
+          const availableSpace = Math.max(spaceBelow - 8, 150) // minimum 150px
+          setMaxHeight(availableSpace)
+        }
       }
+      
+      // Check immediately and after a brief delay to ensure rendering
+      checkPosition()
+      const timeout = setTimeout(checkPosition, 10)
+      
+      // Also check on scroll/resize
+      window.addEventListener('scroll', checkPosition, true)
+      window.addEventListener('resize', checkPosition)
+      
+      return () => {
+        clearTimeout(timeout)
+        window.removeEventListener('scroll', checkPosition, true)
+        window.removeEventListener('resize', checkPosition)
+      }
+    } else {
+      setMaxHeight(undefined)
     }
   }, [isOpen])
 
@@ -67,6 +95,7 @@ const ActionsDisplay = ({ actions, formatActionLog }: { actions: Action[]; forma
         <div 
           ref={dropdownRef}
           className={`actions-dropdown ${flipUpward ? 'dropdown-upward' : ''}`}
+          style={{ maxHeight: maxHeight ? `${maxHeight}px` : undefined }}
         >
           <div className="actions-list">
             {actions.map((action) => (
@@ -84,22 +113,50 @@ const ActionsDisplay = ({ actions, formatActionLog }: { actions: Action[]; forma
 const InventoryDisplay = ({ inventory }: { inventory: InventoryItem[] }) => {
   const [isOpen, setIsOpen] = useState(false)
   const [flipUpward, setFlipUpward] = useState(false)
+  const [maxHeight, setMaxHeight] = useState<number | undefined>(undefined)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (isOpen && dropdownRef.current && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect()
-      const dropdownHeight = dropdownRef.current.offsetHeight || 300 // fallback to max-height
-      const spaceBelow = window.innerHeight - rect.bottom
-      const spaceAbove = rect.top
+      // Use setTimeout to ensure dropdown is fully rendered and measured
+      const checkPosition = () => {
+        if (!dropdownRef.current || !containerRef.current) return
+        
+        const rect = containerRef.current.getBoundingClientRect()
+        const dropdownHeight = dropdownRef.current.scrollHeight || 300
+        const spaceBelow = window.innerHeight - rect.bottom - 4 // margin
+        const spaceAbove = rect.top - 4 // margin
 
-      // Flip upward if there's not enough space below but there is above
-      if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
-        setFlipUpward(true)
-      } else {
-        setFlipUpward(false)
+        // Flip upward if there's not enough space below but there is above
+        if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+          setFlipUpward(true)
+          // Adjust max-height to fit in available space above
+          const availableSpace = Math.max(spaceAbove - 8, 150) // minimum 150px
+          setMaxHeight(availableSpace)
+        } else {
+          setFlipUpward(false)
+          // Adjust max-height to fit in available space below
+          const availableSpace = Math.max(spaceBelow - 8, 150) // minimum 150px
+          setMaxHeight(availableSpace)
+        }
       }
+      
+      // Check immediately and after a brief delay to ensure rendering
+      checkPosition()
+      const timeout = setTimeout(checkPosition, 10)
+      
+      // Also check on scroll/resize
+      window.addEventListener('scroll', checkPosition, true)
+      window.addEventListener('resize', checkPosition)
+      
+      return () => {
+        clearTimeout(timeout)
+        window.removeEventListener('scroll', checkPosition, true)
+        window.removeEventListener('resize', checkPosition)
+      }
+    } else {
+      setMaxHeight(undefined)
     }
   }, [isOpen])
 
@@ -165,6 +222,7 @@ const InventoryDisplay = ({ inventory }: { inventory: InventoryItem[] }) => {
         <div 
           ref={dropdownRef}
           className={`inventory-dropdown ${flipUpward ? 'dropdown-upward' : ''}`}
+          style={{ maxHeight: maxHeight ? `${maxHeight}px` : undefined }}
         >
           <div className="inventory-list">
             {itemCounts.map(({ item, count }, idx) => (

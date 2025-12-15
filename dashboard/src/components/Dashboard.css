@@ -192,6 +192,7 @@
   font-size: 14px;
   color: #dcddde;
   position: relative;
+  overflow: visible;
 }
 
 .dashboard-table tbody tr {
@@ -299,7 +300,7 @@
   border: 1px solid rgba(0, 0, 0, 0.3);
   border-radius: 4px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-  z-index: 1000;
+  z-index: 10000;
   max-height: 300px;
   overflow-y: auto;
   min-width: 250px;
@@ -434,7 +435,7 @@
   border: 1px solid rgba(0, 0, 0, 0.3);
   border-radius: 4px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-  z-index: 1000;
+  z-index: 10000;
   max-height: 300px;
   overflow-y: auto;
   min-width: 300px;

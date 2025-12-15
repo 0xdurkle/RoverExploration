@@ -89,7 +89,7 @@
   display: flex;
   flex-direction: column;
   background-color: #36393f;
-  overflow: hidden;
+  overflow: visible;
   min-width: 0;
   min-height: 0;
 }
@@ -97,9 +97,10 @@
 .app-content {
   padding: 20px;
   width: 100%;
-  overflow-y: auto;
+  overflow-y: visible;
   overflow-x: hidden;
   background-color: #36393f;
   flex: 1;
   min-height: 0;
 }
+
