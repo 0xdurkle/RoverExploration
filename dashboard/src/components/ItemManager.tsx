@@ -430,18 +430,30 @@ const ItemManager = () => {
               </div>
 
               <div className="rarity-actions">
-                <button
-                  onClick={handleSave}
-                  disabled={saving || rarityValue === selectedItem.baseProbability}
-                  className="save-button"
-                >
-                  {saving ? 'Saving...' : 'Save Changes'}
-                </button>
+                <div className="action-buttons-group">
+                  <button
+                    onClick={handleSave}
+                    disabled={saving || rarityValue === selectedItem.baseProbability}
+                    className="save-button"
+                  >
+                    {saving ? 'Saving...' : 'Save Changes'}
+                  </button>
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    disabled={saving || deleting}
+                    className="delete-button"
+                  >
+                    Delete Item
+                  </button>
+                </div>
                 {saveStatus === 'success' && (
                   <span className="save-status success">✓ Saved successfully!</span>
                 )}
                 {saveStatus === 'error' && (
                   <span className="save-status error">✗ Error saving. Please try again.</span>
+                )}
+                {deleteStatus === 'error' && (
+                  <span className="save-status error">✗ Error deleting item. Please try again.</span>
                 )}
               </div>
             </>
