@@ -1,0 +1,74 @@
+{
+  "biomes": [
+    {
+      "id": "crystal_caverns",
+      "name": "Crystal Caverns",
+      "items": [
+        {
+          "name": "Rover Head Fragment",
+          "rarity": "epic",
+          "baseProbability": 0.0025
+        },
+        {
+          "name": "Aurora Heart Crystal",
+          "rarity": "legendary",
+          "baseProbability": 0.01
+        },
+        {
+          "name": "Resonant Geode Core",
+          "rarity": "rare",
+          "baseProbability": 0.04
+        },
+        {
+          "name": "Shard of Echoing Quartz",
+          "rarity": "uncommon",
+          "baseProbability": 0.08
+        }
+      ]
+    },
+    {
+      "id": "rainforest_ruins",
+      "name": "Rainforest Ruins",
+      "items": [
+        {
+          "name": "Moss-Veiled Relic",
+          "rarity": "uncommon",
+          "baseProbability": 0.08
+        },
+        {
+          "name": "Ancient Stone Glyph",
+          "rarity": "rare",
+          "baseProbability": 0.04
+        },
+        {
+          "name": "The Echo Crown",
+          "rarity": "legendary",
+          "baseProbability": 0.01
+        }
+      ]
+    },
+    {
+      "id": "withered_woods",
+      "name": "Withered Woods",
+      "items": [
+        {
+          "name": "Hollowwood Husk",
+          "rarity": "uncommon",
+          "baseProbability": 0.08
+        },
+        {
+          "name": "Spore-Touched Carapace",
+          "rarity": "rare",
+          "baseProbability": 0.04
+        },
+        {
+          "name": "The Rootmind Branch",
+          "rarity": "legendary",
+          "baseProbability": 0.01
+        }
+      ]
+    }
+  ]
+}
+
+

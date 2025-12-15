@@ -265,15 +265,14 @@ app.get('/api/actions', async (req, res) => {
 // Get all items from biomes.json
 app.get('/api/items', (req, res) => {
   try {
-    // Try multiple possible paths (dev vs production)
+    // Use local biomes data bundled with the dashboard-api service
     const possiblePaths = [
-      join(__dirname, '../../src/data/biomes.json'),
-      join(process.cwd(), 'src/data/biomes.json'),
-      join(__dirname, '../../../src/data/biomes.json'),
+      join(process.cwd(), 'data/biomes.json'),
+      join(__dirname, '../data/biomes.json'),
     ];
     let biomesPath = possiblePaths.find(p => existsSync(p));
     if (!biomesPath) {
-      biomesPath = possiblePaths[0]; // Fallback to first path
+      throw new Error(`biomes.json not found. Tried: ${possiblePaths.join(', ')}`);
     }
     const biomesData = JSON.parse(readFileSync(biomesPath, 'utf-8'));
     
@@ -317,15 +316,13 @@ app.put('/api/items/:itemName/rarity', (req, res) => {
       return res.status(400).json({ error: 'baseProbability must be a number between 0 and 1' });
     }
 
-    // Try multiple possible paths (dev vs production)
     const possiblePaths = [
-      join(__dirname, '../../src/data/biomes.json'),
-      join(process.cwd(), 'src/data/biomes.json'),
-      join(__dirname, '../../../src/data/biomes.json'),
+      join(process.cwd(), 'data/biomes.json'),
+      join(__dirname, '../data/biomes.json'),
     ];
     let biomesPath = possiblePaths.find(p => existsSync(p));
     if (!biomesPath) {
-      biomesPath = possiblePaths[0]; // Fallback to first path
+      throw new Error(`biomes.json not found. Tried: ${possiblePaths.join(', ')}`);
     }
     const biomesData = JSON.parse(readFileSync(biomesPath, 'utf-8'));
 
@@ -355,15 +352,13 @@ app.put('/api/items/:itemName/rarity', (req, res) => {
 // Get biomes data
 app.get('/api/biomes', (req, res) => {
   try {
-    // Try multiple possible paths (dev vs production)
     const possiblePaths = [
-      join(__dirname, '../../src/data/biomes.json'),
-      join(process.cwd(), 'src/data/biomes.json'),
-      join(__dirname, '../../../src/data/biomes.json'),
+      join(process.cwd(), 'data/biomes.json'),
+      join(__dirname, '../data/biomes.json'),
     ];
     let biomesPath = possiblePaths.find(p => existsSync(p));
     if (!biomesPath) {
-      biomesPath = possiblePaths[0]; // Fallback to first path
+      throw new Error(`biomes.json not found. Tried: ${possiblePaths.join(', ')}`);
     }
     const biomesData = JSON.parse(readFileSync(biomesPath, 'utf-8'));
     res.json(biomesData);
