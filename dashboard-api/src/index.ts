@@ -381,7 +381,7 @@ app.get('/api/items', (req, res) => {
 });
 
 // Update item rarity (baseProbability)
-app.put('/api/items/:itemName/rarity', (req, res) => {
+app.put('/api/items/:itemName/rarity', async (req, res) => {
   try {
     const { itemName } = req.params;
     const { baseProbability } = req.body;
@@ -416,7 +416,7 @@ app.put('/api/items/:itemName/rarity', (req, res) => {
 });
 
 // Update item details (name, rarity, baseProbability, biome)
-app.put('/api/items/:itemName', (req, res) => {
+app.put('/api/items/:itemName', async (req, res) => {
   try {
     const { itemName } = req.params;
     const { name, rarity, baseProbability, biomeId } = req.body;
@@ -539,7 +539,7 @@ app.put('/api/items/:itemName', (req, res) => {
 });
 
 // Create a new item in a specific biome
-app.post('/api/biomes/:biomeId/items', (req, res) => {
+app.post('/api/biomes/:biomeId/items', async (req, res) => {
   try {
     const { biomeId } = req.params;
     const { name, rarity, baseProbability } = req.body;
@@ -594,7 +594,7 @@ app.post('/api/biomes/:biomeId/items', (req, res) => {
 });
 
 // Delete an item
-app.delete('/api/items/:itemName', (req, res) => {
+app.delete('/api/items/:itemName', async (req, res) => {
   try {
     const { itemName } = req.params;
     const { data: biomesData } = loadBiomesData();
