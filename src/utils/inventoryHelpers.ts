@@ -240,9 +240,30 @@ export function buildBiomeProgress(itemsFound: ItemFound[]): BiomeProgress[] {
           count = matched.count;
           rarity = matched.rarity;
           console.log(`✅ Matched item by normalized name: "${matched.originalName}" -> "${item.name}" (count: ${count})`);
-        } else if (isCrystalCaverns) {
-          console.log(`❌ No match for "${item.name}" (normalized: "${normalized}")`);
-          console.log(`   Available normalized items: ${Array.from(normalizedUserItems.keys()).join(', ')}`);
+        } else {
+          // Try partial/fuzzy matching - check if any user item contains the biome item name or vice versa
+          const itemWords = normalized.split(/\s+/).filter(w => w.length > 2); // Split into words, ignore short words
+          
+          for (const [userNormalized, userData] of normalizedUserItems.entries()) {
+            const userWords = userNormalized.split(/\s+/).filter(w => w.length > 2);
+            
+            // Check if all significant words from biome item are in user item
+            const allWordsMatch = itemWords.every(word => userNormalized.includes(word));
+            // Or check if user item contains the core part of biome item (at least 3+ character words)
+            const coreMatch = itemWords.some(word => word.length >= 4 && userNormalized.includes(word));
+            
+            if (allWordsMatch || coreMatch) {
+              count = userData.count;
+              rarity = userData.rarity;
+              console.log(`✅ Matched item by fuzzy matching: "${userData.originalName}" -> "${item.name}" (count: ${count})`);
+              break;
+            }
+          }
+          
+          if (count === 0 && isCrystalCaverns) {
+            console.log(`❌ No match for "${item.name}" (normalized: "${normalized}")`);
+            console.log(`   Available normalized items: ${Array.from(normalizedUserItems.keys()).join(', ')}`);
+          }
         }
       }
       
