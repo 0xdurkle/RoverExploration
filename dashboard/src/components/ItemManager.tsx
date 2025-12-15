@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import './RarityEditor.css'
+import './ItemManager.css'
 import { API_BASE_URL } from '../config'
 
 interface Item {
