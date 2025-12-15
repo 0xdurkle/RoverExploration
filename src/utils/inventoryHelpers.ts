@@ -191,8 +191,11 @@ export function buildBiomeProgress(itemsFound: ItemFound[]): BiomeProgress[] {
   // Also create a normalized map (lowercase, trimmed) for fuzzy matching
   const normalizedUserItems = new Map<string, { originalName: string; count: number; rarity: string }>();
   
+  // Debug: log all user items
+  const uniqueUserItems = new Set<string>();
   itemsFound.forEach((item) => {
     if (!item || !item.name) return;
+    uniqueUserItems.add(item.name);
     
     // Store the rarity that was actually discovered (most recent if multiple)
     if (!storedRarities.has(item.name)) {
@@ -216,11 +219,18 @@ export function buildBiomeProgress(itemsFound: ItemFound[]): BiomeProgress[] {
   biomes.forEach((biome) => {
     const items: ItemCount[] = [];
     let itemsFoundCount = 0;
+    
+    // Debug logging for Crystal Caverns
+    const isCrystalCaverns = biome.id === 'crystal_caverns';
 
     biome.items.forEach((item) => {
       // First try exact match
       let count = userCounts.get(item.name) || 0;
       let rarity = storedRarities.get(item.name) || item.rarity;
+      
+      if (isCrystalCaverns) {
+        console.log(`🔍 Checking "${item.name}": exact match count = ${count}`);
+      }
       
       // If no exact match, try normalized (case-insensitive, trimmed) match
       if (count === 0) {
@@ -229,7 +239,10 @@ export function buildBiomeProgress(itemsFound: ItemFound[]): BiomeProgress[] {
         if (matched) {
           count = matched.count;
           rarity = matched.rarity;
-          console.log(`✅ Matched item by normalized name: "${matched.originalName}" -> "${item.name}"`);
+          console.log(`✅ Matched item by normalized name: "${matched.originalName}" -> "${item.name}" (count: ${count})`);
+        } else if (isCrystalCaverns) {
+          console.log(`❌ No match for "${item.name}" (normalized: "${normalized}")`);
+          console.log(`   Available normalized items: ${Array.from(normalizedUserItems.keys()).join(', ')}`);
         }
       }
       
@@ -243,6 +256,11 @@ export function buildBiomeProgress(itemsFound: ItemFound[]): BiomeProgress[] {
         emoji: getRarityEmoji(rarity as 'uncommon' | 'rare' | 'legendary' | 'epic'),
       });
     });
+    
+    if (isCrystalCaverns) {
+      console.log(`📊 Crystal Caverns progress: ${itemsFoundCount}/${biome.items.length} items found`);
+      console.log(`   User has these items: ${Array.from(uniqueUserItems).join(', ')}`);
+    }
 
     biomeProgress.push({
       biomeId: biome.id,
