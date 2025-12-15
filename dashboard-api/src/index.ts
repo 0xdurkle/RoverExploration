@@ -334,7 +334,7 @@ async function saveBiomesData(biomesData: any): Promise<void> {
       });
 
       if (response.ok) {
-        const result = await response.json();
+        const result = await response.json() as { message?: string };
         console.log('✅ Synced biomes.json to bot service:', result.message || 'Success');
       } else {
         const errorText = await response.text();
