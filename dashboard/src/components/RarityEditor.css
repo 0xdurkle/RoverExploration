@@ -256,7 +256,37 @@
   align-items: center;
   gap: 12px;
   padding-top: 24px;
-  border-top: 1px solid #40444b;
+  /* Removed dividing line under quick presets to keep the panel clean */
+  border-top: none;
+}
+
+.rarity-editor-create {
+  margin-top: 32px;
+  background-color: #2c2f33;
+  border-radius: 8px;
+  padding: 24px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.rarity-editor-create h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.create-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.create-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .save-button {
@@ -319,3 +349,4 @@
     position: static;
   }
 }
+

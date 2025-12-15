@@ -349,6 +349,163 @@ app.put('/api/items/:itemName/rarity', (req, res) => {
   }
 });
 
+// Update item details (name, rarity, baseProbability, biome)
+app.put('/api/items/:itemName', (req, res) => {
+  try {
+    const { itemName } = req.params;
+    const { name, rarity, baseProbability, biomeId } = req.body;
+
+    if (baseProbability !== undefined) {
+      if (typeof baseProbability !== 'number' || baseProbability < 0 || baseProbability > 1) {
+        return res.status(400).json({ error: 'baseProbability must be a number between 0 and 1' });
+      }
+    }
+
+    if (name !== undefined && (typeof name !== 'string' || !name.trim())) {
+      return res.status(400).json({ error: 'name must be a non-empty string' });
+    }
+
+    if (rarity !== undefined && typeof rarity !== 'string') {
+      return res.status(400).json({ error: 'rarity must be a string' });
+    }
+
+    // Load biomes data
+    const possiblePaths = [
+      join(process.cwd(), 'data/biomes.json'),
+      join(__dirname, '../data/biomes.json'),
+    ];
+    let biomesPath = possiblePaths.find(p => existsSync(p));
+    if (!biomesPath) {
+      throw new Error(`biomes.json not found. Tried: ${possiblePaths.join(', ')}`);
+    }
+    const biomesData = JSON.parse(readFileSync(biomesPath, 'utf-8'));
+
+    let found = false;
+    let targetBiome: any = null;
+    let targetItem: any = null;
+
+    // Find the item by its current name
+    for (const biome of biomesData.biomes) {
+      for (const item of biome.items) {
+        if (item.name === itemName) {
+          found = true;
+          targetBiome = biome;
+          targetItem = item;
+          break;
+        }
+      }
+      if (found) break;
+    }
+
+    if (!found) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+
+    // Apply updates on the found item
+    if (name !== undefined) {
+      targetItem.name = name;
+    }
+    if (rarity !== undefined) {
+      targetItem.rarity = rarity;
+    }
+    if (baseProbability !== undefined) {
+      targetItem.baseProbability = baseProbability;
+    }
+
+    // Move to a different biome if biomeId is provided and different
+    if (biomeId && biomeId !== targetBiome.id) {
+      const newBiome = biomesData.biomes.find((b: any) => b.id === biomeId);
+      if (!newBiome) {
+        return res.status(400).json({ error: 'Invalid biomeId' });
+      }
+      // Remove from old biome
+      targetBiome.items = targetBiome.items.filter((i: any) => i !== targetItem);
+      // Add to new biome
+      newBiome.items.push(targetItem);
+      targetBiome = newBiome;
+    }
+
+    writeFileSync(biomesPath, JSON.stringify(biomesData, null, 2), 'utf-8');
+
+    res.json({
+      success: true,
+      item: {
+        name: targetItem.name,
+        rarity: targetItem.rarity,
+        baseProbability: targetItem.baseProbability,
+        biome: targetBiome.name,
+        biomeId: targetBiome.id,
+      },
+    });
+  } catch (error) {
+    console.error('Error updating item:', error);
+    res.status(500).json({ error: 'Failed to update item' });
+  }
+});
+
+// Create a new item in a specific biome
+app.post('/api/biomes/:biomeId/items', (req, res) => {
+  try {
+    const { biomeId } = req.params;
+    const { name, rarity, baseProbability } = req.body;
+
+    if (typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ error: 'name is required and must be a non-empty string' });
+    }
+
+    if (typeof rarity !== 'string' || !rarity.trim()) {
+      return res.status(400).json({ error: 'rarity is required and must be a string' });
+    }
+
+    if (typeof baseProbability !== 'number' || baseProbability < 0 || baseProbability > 1) {
+      return res.status(400).json({ error: 'baseProbability must be a number between 0 and 1' });
+    }
+
+    const possiblePaths = [
+      join(process.cwd(), 'data/biomes.json'),
+      join(__dirname, '../data/biomes.json'),
+    ];
+    let biomesPath = possiblePaths.find(p => existsSync(p));
+    if (!biomesPath) {
+      throw new Error(`biomes.json not found. Tried: ${possiblePaths.join(', ')}`);
+    }
+    const biomesData = JSON.parse(readFileSync(biomesPath, 'utf-8'));
+
+    const biome = biomesData.biomes.find((b: any) => b.id === biomeId);
+    if (!biome) {
+      return res.status(400).json({ error: 'Invalid biomeId' });
+    }
+
+    if (biome.items.some((i: any) => i.name === name)) {
+      return res.status(409).json({ error: 'An item with that name already exists in this biome' });
+    }
+
+    const newItem = {
+      name,
+      rarity,
+      baseProbability,
+    };
+
+    biome.items.push(newItem);
+
+    writeFileSync(biomesPath, JSON.stringify(biomesData, null, 2), 'utf-8');
+
+    res.status(201).json({
+      success: true,
+      item: {
+        name,
+        rarity,
+        baseProbability,
+        biome: biome.name,
+        biomeId: biome.id,
+      },
+    });
+  } catch (error) {
+    console.error('Error creating item:', error);
+    res.status(500).json({ error: 'Failed to create item' });
+  }
+});
+
 // Get biomes data
 app.get('/api/biomes', (req, res) => {
   try {
