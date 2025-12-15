@@ -286,8 +286,8 @@ function loadBiomesData(): { data: any; path: string } {
   return { data, path: biomesPath };
 }
 
-// Helper function to save biomes.json to all accessible locations
-function saveBiomesData(biomesData: any): void {
+// Helper function to save biomes.json to all accessible locations and sync with bot
+async function saveBiomesData(biomesData: any): Promise<void> {
   const possiblePaths = getBiomesPaths();
   const jsonString = JSON.stringify(biomesData, null, 2);
   
@@ -314,6 +314,35 @@ function saveBiomesData(biomesData: any): void {
   }
   
   console.log(`✅ Synced biomes.json to ${savedCount} location(s)`);
+
+  // Sync with bot service
+  const botSyncUrl = process.env.BOT_SYNC_URL;
+  const syncApiKey = process.env.SYNC_API_KEY;
+  
+  if (botSyncUrl && syncApiKey) {
+    try {
+      const response = await fetch(`${botSyncUrl}/api/sync/biomes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': syncApiKey,
+        },
+        body: JSON.stringify({ biomes: biomesData }),
+      });
+
+      if (response.ok) {
+        console.log('✅ Synced biomes.json to bot service');
+      } else {
+        const errorText = await response.text();
+        console.warn(`⚠️ Failed to sync with bot service: ${response.status} - ${errorText}`);
+      }
+    } catch (error: any) {
+      console.warn(`⚠️ Error syncing with bot service: ${error.message}`);
+      // Don't throw - local save succeeded, sync is optional
+    }
+  } else {
+    console.warn('⚠️ BOT_SYNC_URL or SYNC_API_KEY not set, skipping bot sync');
+  }
 }
 
 // Get all items from biomes.json
@@ -377,7 +406,7 @@ app.put('/api/items/:itemName/rarity', (req, res) => {
       return res.status(404).json({ error: 'Item not found' });
     }
 
-    saveBiomesData(biomesData);
+    await saveBiomesData(biomesData);
 
     res.json({ success: true, itemName, baseProbability });
   } catch (error) {
@@ -457,7 +486,7 @@ app.put('/api/items/:itemName', (req, res) => {
       targetBiome = newBiome;
     }
 
-    saveBiomesData(biomesData);
+    await saveBiomesData(biomesData);
 
     // If name changed, update all database entries with the old name
     if (oldName) {
@@ -546,7 +575,7 @@ app.post('/api/biomes/:biomeId/items', (req, res) => {
 
     biome.items.push(newItem);
 
-    saveBiomesData(biomesData);
+    await saveBiomesData(biomesData);
 
     res.status(201).json({
       success: true,
@@ -588,7 +617,7 @@ app.delete('/api/items/:itemName', (req, res) => {
       return res.status(404).json({ error: 'Item not found' });
     }
 
-    saveBiomesData(biomesData);
+    await saveBiomesData(biomesData);
 
     res.json({
       success: true,

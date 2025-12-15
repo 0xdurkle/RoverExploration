@@ -1,6 +1,9 @@
 import { Client, GatewayIntentBits, Collection, Events } from 'discord.js';
 import { config } from 'dotenv';
 import * as cron from 'node-cron';
+import express, { Request, Response } from 'express';
+import { writeFileSync } from 'fs';
+import { reloadBiomesData, getBiomesPathForSync } from './data/biomesLoader';
 import { initDatabase, closeDatabase } from './db/connection';
 import { handleExploreCommand, getExploreCommandBuilder } from './commands/explore';
 import { handleHowCommand } from './commands/how';
@@ -211,6 +214,49 @@ process.on('SIGTERM', async () => {
   await closeDatabase();
   client.destroy();
   process.exit(0);
+});
+
+// HTTP server for biomes.json sync endpoint
+const syncApp = express();
+syncApp.use(express.json());
+
+const SYNC_API_KEY = process.env.SYNC_API_KEY || 'change-me-in-production';
+const SYNC_PORT = parseInt(process.env.SYNC_PORT || '3000', 10);
+
+// Sync endpoint - updates bot's biomes.json
+syncApp.post('/api/sync/biomes', (req: Request, res: Response) => {
+  try {
+    const apiKey = req.headers['x-api-key'] || req.body.apiKey;
+    if (apiKey !== SYNC_API_KEY) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const biomesData = req.body.biomes;
+    if (!biomesData || !biomesData.biomes) {
+      return res.status(400).json({ error: 'Invalid biomes data' });
+    }
+
+    const biomesPath = getBiomesPathForSync();
+    writeFileSync(biomesPath, JSON.stringify(biomesData, null, 2), 'utf-8');
+    
+    // Reload the biomes data in memory
+    reloadBiomesData();
+    
+    console.log(`✅ Biomes.json synced from dashboard-api and reloaded`);
+    res.json({ success: true, message: 'Biomes.json updated and reloaded successfully' });
+  } catch (error: any) {
+    console.error('❌ Error syncing biomes:', error);
+    res.status(500).json({ error: 'Failed to sync biomes', details: error.message });
+  }
+});
+
+// Health check endpoint
+syncApp.get('/health', (req: Request, res: Response) => {
+  res.json({ status: 'ok', service: 'bot' });
+});
+
+syncApp.listen(SYNC_PORT, () => {
+  console.log(`✅ Bot sync server running on port ${SYNC_PORT}`);
 });
 
 // Login

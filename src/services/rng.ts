@@ -1,4 +1,4 @@
-import biomesData from '../data/biomes.json';
+import { loadBiomesData } from '../data/biomesLoader';
 
 interface Biome {
   id: string;
@@ -26,6 +26,7 @@ export function discoverItem(biomeId: string, durationHours: number): {
   name: string;
   rarity: 'uncommon' | 'rare' | 'legendary' | 'epic';
 } | null {
+  const biomesData = loadBiomesData();
   const biome = (biomesData.biomes as Biome[]).find(b => b.id === biomeId);
   if (!biome) {
     throw new Error(`Biome ${biomeId} not found`);
@@ -88,6 +89,7 @@ export function discoverItem(biomeId: string, durationHours: number): {
  * Get biome data by ID
  */
 export function getBiome(biomeId: string): Biome | undefined {
+  const biomesData = loadBiomesData();
   return (biomesData.biomes as Biome[]).find(b => b.id === biomeId);
 }
 
@@ -95,6 +97,7 @@ export function getBiome(biomeId: string): Biome | undefined {
  * Get all biomes
  */
 export function getAllBiomes(): Biome[] {
+  const biomesData = loadBiomesData();
   return biomesData.biomes as Biome[];
 }
 
@@ -102,6 +105,7 @@ export function getAllBiomes(): Biome[] {
  * Get duration multiplier
  */
 export function getDurationMultiplier(durationHours: number): number {
+  const biomesData = loadBiomesData();
   const duration = (biomesData.durations as Duration[]).find(d => d.hours === durationHours);
   return duration?.multiplier || 1.0;
 }
@@ -110,6 +114,7 @@ export function getDurationMultiplier(durationHours: number): number {
  * Get rarity emoji
  */
 export function getRarityEmoji(rarity: 'uncommon' | 'rare' | 'legendary' | 'epic'): string {
+  const biomesData = loadBiomesData();
   // Map epic to fragment emoji
   const rarityKey = rarity === 'epic' ? 'epic' : rarity;
   return biomesData.rarityEmojis[rarityKey] || '⚪';

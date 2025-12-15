@@ -3,7 +3,7 @@
  * Handles shared loot rolls for party expeditions with bonuses
  */
 
-import biomesData from '../data/biomes.json';
+import { loadBiomesData } from '../data/biomesLoader';
 import { applyPartyBonus } from './partyService';
 
 interface Biome {
@@ -32,6 +32,7 @@ export function rollPartyLoot(biomeId: string, durationHours: number, partySize:
   name: string;
   rarity: 'uncommon' | 'rare' | 'legendary' | 'epic';
 } | null {
+  const biomesData = loadBiomesData();
   const biome = (biomesData.biomes as Biome[]).find((b) => b.id === biomeId);
   if (!biome) {
     throw new Error(`Biome ${biomeId} not found`);
@@ -51,6 +52,7 @@ export function rollPartyLoot(biomeId: string, durationHours: number, partySize:
   // Get duration multiplier
   let durationMultiplier = 1.0;
   if (!is30Second) {
+    const biomesData = loadBiomesData();
     const duration = (biomesData.durations as Duration[]).find((d) => Math.abs(d.hours - durationHours) < 0.0001);
     durationMultiplier = duration?.multiplier || 1.0;
   }
