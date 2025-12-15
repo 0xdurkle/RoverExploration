@@ -298,9 +298,12 @@ app.get('/api/items', (req, res) => {
     });
 
     res.json(allItems);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching items:', error);
-    res.status(500).json({ error: 'Failed to fetch items' });
+    res.status(500).json({
+      error: 'Failed to fetch items',
+      details: error.stack || error.message || String(error),
+    });
   }
 });
 
