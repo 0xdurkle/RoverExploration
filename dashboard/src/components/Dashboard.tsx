@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import './Dashboard.css'
 import { API_BASE_URL } from '../config'
 
@@ -27,13 +27,32 @@ interface Action {
 
 const ActionsDisplay = ({ actions, formatActionLog }: { actions: Action[]; formatActionLog: (action: Action) => string }) => {
   const [isOpen, setIsOpen] = useState(false)
+  const [flipUpward, setFlipUpward] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (isOpen && dropdownRef.current && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect()
+      const dropdownHeight = dropdownRef.current.offsetHeight || 300 // fallback to max-height
+      const spaceBelow = window.innerHeight - rect.bottom
+      const spaceAbove = rect.top
+
+      // Flip upward if there's not enough space below but there is above
+      if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
+        setFlipUpward(true)
+      } else {
+        setFlipUpward(false)
+      }
+    }
+  }, [isOpen])
 
   if (actions.length === 0) {
     return <span className="empty-state">No actions</span>
   }
 
   return (
-    <div className="actions-display">
+    <div className="actions-display" ref={containerRef}>
       <button
         className="actions-toggle"
         onClick={() => setIsOpen(!isOpen)}
@@ -42,10 +61,13 @@ const ActionsDisplay = ({ actions, formatActionLog }: { actions: Action[]; forma
         <span className="actions-summary">
           {actions.length} Action{actions.length !== 1 ? 's' : ''}
         </span>
-        <span className="actions-arrow">{isOpen ? '▼' : '▶'}</span>
+        <span className="actions-arrow">{isOpen ? (flipUpward ? '▲' : '▼') : '▶'}</span>
       </button>
       {isOpen && (
-        <div className="actions-dropdown">
+        <div 
+          ref={dropdownRef}
+          className={`actions-dropdown ${flipUpward ? 'dropdown-upward' : ''}`}
+        >
           <div className="actions-list">
             {actions.map((action) => (
               <div key={action.id} className="action-item-row">
@@ -61,6 +83,25 @@ const ActionsDisplay = ({ actions, formatActionLog }: { actions: Action[]; forma
 
 const InventoryDisplay = ({ inventory }: { inventory: InventoryItem[] }) => {
   const [isOpen, setIsOpen] = useState(false)
+  const [flipUpward, setFlipUpward] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (isOpen && dropdownRef.current && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect()
+      const dropdownHeight = dropdownRef.current.offsetHeight || 300 // fallback to max-height
+      const spaceBelow = window.innerHeight - rect.bottom
+      const spaceAbove = rect.top
+
+      // Flip upward if there's not enough space below but there is above
+      if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
+        setFlipUpward(true)
+      } else {
+        setFlipUpward(false)
+      }
+    }
+  }, [isOpen])
 
   if (inventory.length === 0) {
     return <span className="empty-state">No items</span>
@@ -109,7 +150,7 @@ const InventoryDisplay = ({ inventory }: { inventory: InventoryItem[] }) => {
   }
 
   return (
-    <div className="inventory-display">
+    <div className="inventory-display" ref={containerRef}>
       <button
         className="inventory-toggle"
         onClick={() => setIsOpen(!isOpen)}
@@ -118,10 +159,13 @@ const InventoryDisplay = ({ inventory }: { inventory: InventoryItem[] }) => {
         <span className="inventory-summary">
           {totalItems} Item{totalItems !== 1 ? 's' : ''}
         </span>
-        <span className="inventory-arrow">{isOpen ? '▼' : '▶'}</span>
+        <span className="inventory-arrow">{isOpen ? (flipUpward ? '▲' : '▼') : '▶'}</span>
       </button>
       {isOpen && (
-        <div className="inventory-dropdown">
+        <div 
+          ref={dropdownRef}
+          className={`inventory-dropdown ${flipUpward ? 'dropdown-upward' : ''}`}
+        >
           <div className="inventory-list">
             {itemCounts.map(({ item, count }, idx) => (
               <div key={idx} className="inventory-item-row">

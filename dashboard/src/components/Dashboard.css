@@ -156,6 +156,7 @@
   border: 1px solid rgba(0, 0, 0, 0.2);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
   max-height: none;
+  position: relative;
 }
 
 .dashboard-table {
@@ -304,6 +305,13 @@
   min-width: 250px;
 }
 
+.inventory-dropdown.dropdown-upward {
+  top: auto;
+  bottom: 100%;
+  margin-top: 0;
+  margin-bottom: 4px;
+}
+
 /* Custom scrollbar for inventory dropdown */
 .inventory-dropdown::-webkit-scrollbar {
   width: 6px;
@@ -430,6 +438,13 @@
   max-height: 300px;
   overflow-y: auto;
   min-width: 300px;
+}
+
+.actions-dropdown.dropdown-upward {
+  top: auto;
+  bottom: 100%;
+  margin-top: 0;
+  margin-bottom: 4px;
 }
 
 .actions-list {
