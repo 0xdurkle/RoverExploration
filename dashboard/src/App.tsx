@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import Dashboard from './components/Dashboard'
-import RarityEditor from './components/RarityEditor'
 import ItemManager from './components/ItemManager'
 import './App.css'
 
-type TabId = 'dashboard' | 'rarity' | 'items'
+type TabId = 'dashboard' | 'items'
 
 function App() {
   const [activeTab, setActiveTab] = useState<TabId>('dashboard')
@@ -24,13 +23,6 @@ function App() {
             <span>Dashboard</span>
           </button>
           <button
-            className={`nav-item ${activeTab === 'rarity' ? 'active' : ''}`}
-            onClick={() => setActiveTab('rarity')}
-          >
-            <span className="nav-icon">🎯</span>
-            <span>Rarity Editor</span>
-          </button>
-          <button
             className={`nav-item ${activeTab === 'items' ? 'active' : ''}`}
             onClick={() => setActiveTab('items')}
           >
@@ -42,7 +34,6 @@ function App() {
       <div className="app-main">
         <div className="app-content">
           {activeTab === 'dashboard' && <Dashboard />}
-          {activeTab === 'rarity' && <RarityEditor />}
           {activeTab === 'items' && <ItemManager />}
         </div>
       </div>
