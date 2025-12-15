@@ -25,8 +25,19 @@ interface Action {
   createdAt: string
 }
 
-const ActionsDisplay = ({ actions, formatActionLog }: { actions: Action[]; formatActionLog: (action: Action) => string }) => {
-  const [isOpen, setIsOpen] = useState(false)
+const ActionsDisplay = ({ 
+  actions, 
+  formatActionLog,
+  isOpen,
+  onToggle,
+  onOpen
+}: { 
+  actions: Action[]
+  formatActionLog: (action: Action) => string
+  isOpen: boolean
+  onToggle: () => void
+  onOpen: () => void
+}) => {
   const [flipUpward, setFlipUpward] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -55,6 +66,13 @@ const ActionsDisplay = ({ actions, formatActionLog }: { actions: Action[]; forma
     }
   }, [isOpen])
 
+  const handleToggle = () => {
+    if (!isOpen) {
+      onOpen() // Notify parent that this dropdown is opening
+    }
+    onToggle()
+  }
+
   if (actions.length === 0) {
     return <span className="empty-state">No actions</span>
   }
@@ -63,7 +81,7 @@ const ActionsDisplay = ({ actions, formatActionLog }: { actions: Action[]; forma
     <div className="actions-display" ref={containerRef}>
       <button
         className="actions-toggle"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleToggle}
         type="button"
       >
         <span className="actions-summary">
@@ -89,8 +107,17 @@ const ActionsDisplay = ({ actions, formatActionLog }: { actions: Action[]; forma
   )
 }
 
-const InventoryDisplay = ({ inventory }: { inventory: InventoryItem[] }) => {
-  const [isOpen, setIsOpen] = useState(false)
+const InventoryDisplay = ({ 
+  inventory,
+  isOpen,
+  onToggle,
+  onOpen
+}: { 
+  inventory: InventoryItem[]
+  isOpen: boolean
+  onToggle: () => void
+  onOpen: () => void
+}) => {
   const [flipUpward, setFlipUpward] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -118,6 +145,13 @@ const InventoryDisplay = ({ inventory }: { inventory: InventoryItem[] }) => {
       }
     }
   }, [isOpen])
+
+  const handleToggle = () => {
+    if (!isOpen) {
+      onOpen() // Notify parent that this dropdown is opening
+    }
+    onToggle()
+  }
 
   if (inventory.length === 0) {
     return <span className="empty-state">No items</span>
@@ -169,7 +203,7 @@ const InventoryDisplay = ({ inventory }: { inventory: InventoryItem[] }) => {
     <div className="inventory-display" ref={containerRef}>
       <button
         className="inventory-toggle"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleToggle}
         type="button"
       >
         <span className="inventory-summary">
@@ -513,12 +547,29 @@ const Dashboard = () => {
                   )}
                   {columns.find((c) => c.id === 'inventory')?.visible && (
                     <td>
-                      <InventoryDisplay inventory={user.inventory} />
+                      <InventoryDisplay 
+                        inventory={user.inventory}
+                        isOpen={openDropdown === `${user.discordId}-inventory`}
+                        onToggle={() => {
+                          const key = `${user.discordId}-inventory`
+                          setOpenDropdown(openDropdown === key ? null : key)
+                        }}
+                        onOpen={() => setOpenDropdown(`${user.discordId}-inventory`)}
+                      />
                     </td>
                   )}
                   {columns.find((c) => c.id === 'actions')?.visible && (
                     <td>
-                      <ActionsDisplay actions={userActions} formatActionLog={formatActionLog} />
+                      <ActionsDisplay 
+                        actions={userActions} 
+                        formatActionLog={formatActionLog}
+                        isOpen={openDropdown === `${user.discordId}-actions`}
+                        onToggle={() => {
+                          const key = `${user.discordId}-actions`
+                          setOpenDropdown(openDropdown === key ? null : key)
+                        }}
+                        onOpen={() => setOpenDropdown(`${user.discordId}-actions`)}
+                      />
                     </td>
                   )}
                 </tr>
