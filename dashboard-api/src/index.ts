@@ -161,7 +161,11 @@ app.get('/api/users', async (req, res) => {
     if (error.code === '42P01') {
       return res.json([]);
     }
-    res.status(500).json({ error: 'Failed to fetch users', details: error.message });
+    res.status(500).json({
+      error: 'Failed to fetch users',
+      // Expose full stack so we can see exactly where the error comes from
+      details: error.stack || error.message || String(error),
+    });
   }
 });
 
