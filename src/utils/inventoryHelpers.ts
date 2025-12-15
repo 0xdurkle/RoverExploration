@@ -188,10 +188,26 @@ export function buildBiomeProgress(itemsFound: ItemFound[]): BiomeProgress[] {
   
   // Create a map of item name -> stored rarity from user's found items
   const storedRarities = new Map<string, string>();
+  // Also create a normalized map (lowercase, trimmed) for fuzzy matching
+  const normalizedUserItems = new Map<string, { originalName: string; count: number; rarity: string }>();
+  
   itemsFound.forEach((item) => {
+    if (!item || !item.name) return;
+    
     // Store the rarity that was actually discovered (most recent if multiple)
     if (!storedRarities.has(item.name)) {
       storedRarities.set(item.name, item.rarity);
+    }
+    
+    // Create normalized version for fuzzy matching
+    const normalized = item.name.toLowerCase().trim();
+    const count = userCounts.get(item.name) || 0;
+    if (!normalizedUserItems.has(normalized)) {
+      normalizedUserItems.set(normalized, {
+        originalName: item.name,
+        count,
+        rarity: item.rarity,
+      });
     }
   });
   
@@ -202,11 +218,22 @@ export function buildBiomeProgress(itemsFound: ItemFound[]): BiomeProgress[] {
     let itemsFoundCount = 0;
 
     biome.items.forEach((item) => {
-      const count = userCounts.get(item.name) || 0;
+      // First try exact match
+      let count = userCounts.get(item.name) || 0;
+      let rarity = storedRarities.get(item.name) || item.rarity;
+      
+      // If no exact match, try normalized (case-insensitive, trimmed) match
+      if (count === 0) {
+        const normalized = item.name.toLowerCase().trim();
+        const matched = normalizedUserItems.get(normalized);
+        if (matched) {
+          count = matched.count;
+          rarity = matched.rarity;
+          console.log(`✅ Matched item by normalized name: "${matched.originalName}" -> "${item.name}"`);
+        }
+      }
+      
       if (count > 0) itemsFoundCount++;
-
-      // Use stored rarity if user has found this item, otherwise use biome data rarity
-      const rarity = storedRarities.get(item.name) || item.rarity;
 
       items.push({
         name: item.name,
@@ -237,4 +264,5 @@ export function formatItemLine(item: ItemCount): string {
   const rarityName = getRarityDisplayName(item.rarity);
   return `${item.emoji} ${item.name} (${rarityName}) — ${item.count}x`;
 }
+
 
