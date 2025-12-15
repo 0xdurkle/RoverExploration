@@ -301,7 +301,7 @@
   border-radius: 4px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   z-index: 10000;
-  max-height: 300px;
+  max-height: min(400px, calc(100vh - 200px));
   overflow-y: auto;
   min-width: 250px;
 }
@@ -436,7 +436,7 @@
   border-radius: 4px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   z-index: 10000;
-  max-height: 300px;
+  max-height: min(400px, calc(100vh - 200px));
   overflow-y: auto;
   min-width: 300px;
 }
